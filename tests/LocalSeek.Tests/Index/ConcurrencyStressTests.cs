@@ -31,6 +31,7 @@ public class ConcurrencyStressTests
         var errors = new ConcurrentQueue<Exception>();
         using var done = new CancellationTokenSource();
         var searches = 0;
+        var overlapDeadline = DateTime.UtcNow.AddSeconds(30);
 
         var indexer = Task.Run(() =>
         {
@@ -68,6 +69,13 @@ public class ConcurrencyStressTests
                 if (random.Next(3) == 0)
                 {
                     writer.Commit();
+                }
+
+                // Keep churning (same seeded sequence) until merges and searches have really overlapped,
+                // so the test does not pass vacuously on a busy machine.
+                if (step == 399 && (writer.GetStatistics().MergesCompleted < 3 || Volatile.Read(ref searches) < 50) && overlapDeadline > DateTime.UtcNow)
+                {
+                    step = 0;
                 }
             }
 
@@ -128,8 +136,12 @@ public class ConcurrencyStressTests
         await merger;
         await Task.WhenAll(searchers);
 
-        Assert.Empty(errors);
-        Assert.True(searches > 20, $"Only {searches} searches ran.");
-        Assert.True(writer.GetStatistics().MergesCompleted > 0, "No merge ran during the stress test.");
+        if (!errors.IsEmpty)
+        {
+            throw new AggregateException("Concurrent search saw an inconsistency or failed.", errors);
+        }
+
+        Assert.True(searches >= 50, $"Only {searches} searches ran.");
+        Assert.True(writer.GetStatistics().MergesCompleted >= 3, $"Only {writer.GetStatistics().MergesCompleted} merges ran during the stress test.");
     }
 }

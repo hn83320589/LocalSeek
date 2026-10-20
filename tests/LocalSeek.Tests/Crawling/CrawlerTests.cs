@@ -160,6 +160,21 @@ public class CrawlerTests
     }
 
     [Fact]
+    public void Root_unavailable_is_cleared_when_the_root_returns_but_other_root_notices_stay()
+    {
+        var fs = new FakeSourceFileSystem();
+        Crawl(fs, @"C:\late");
+        fs.File(@"C:\late\a.txt", "a");
+
+        Assert.Equal([@"C:\late\a.txt"], Crawl(fs, @"C:\late"));
+        Assert.False(_diagnostics.TryGet(@"C:\late", out _));
+
+        _diagnostics.Record(@"C:\late", DiagnosticKind.WatcherFallback, "periodic");
+        Crawl(fs, @"C:\late");
+        Assert.Equal(DiagnosticKind.WatcherFallback, KindOf(@"C:\late"));
+    }
+
+    [Fact]
     public void Reader_classifies_locked_changed_missing_and_denied_files()
     {
         var fs = new FakeSourceFileSystem()

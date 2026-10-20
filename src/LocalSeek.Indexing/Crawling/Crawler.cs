@@ -24,7 +24,9 @@ public sealed class CrawlStatistics
 /// </summary>
 public sealed class Crawler(ISourceFileSystem fileSystem, DiagnosticsLog diagnostics)
 {
-    public IEnumerable<SourceEntry> Crawl(string root, ExclusionRules rules, CrawlOptions options, CrawlStatistics? statistics = null, CancellationToken cancellation = default)
+    /// <param name="startDirectory">A directory inside <paramref name="root"/> to crawl instead of the whole root;
+    /// exclusion rules still see paths relative to the root.</param>
+    public IEnumerable<SourceEntry> Crawl(string root, ExclusionRules rules, CrawlOptions options, CrawlStatistics? statistics = null, CancellationToken cancellation = default, string? startDirectory = null)
     {
         statistics ??= new CrawlStatistics();
         var rootEntry = fileSystem.GetEntry(root);
@@ -34,11 +36,18 @@ public sealed class Crawler(ISourceFileSystem fileSystem, DiagnosticsLog diagnos
             yield break;
         }
 
-        diagnostics.Clear(root);
+        if (diagnostics.TryGet(root, out var previous) && previous.Kind == DiagnosticKind.RootUnavailable)
+        {
+            diagnostics.Clear(root);
+        }
+
         var rootCanonical = Canonical(fileSystem.GetLinkTarget(root) ?? root);
-        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { rootCanonical };
+        var start = startDirectory ?? root;
+        var startCanonical = startDirectory is null ? rootCanonical : Canonical(fileSystem.GetLinkTarget(start) ?? start);
+        var startRelative = startDirectory is null ? "" : Path.GetRelativePath(root, start).Replace('\\', '/');
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { rootCanonical, startCanonical };
         var stack = new Stack<(string Path, string Canonical, string Relative)>();
-        stack.Push((root, rootCanonical, ""));
+        stack.Push((start, startCanonical, startRelative));
 
         while (stack.Count > 0)
         {
