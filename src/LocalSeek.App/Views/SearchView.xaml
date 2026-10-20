@@ -1,0 +1,83 @@
+<UserControl x:Class="LocalSeek.App.Views.SearchView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:LocalSeek.App.ViewModels">
+  <Grid Padding="12" RowSpacing="8">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <TextBox x:Name="SearchBox"
+             PlaceholderText="輸入關鍵字，例如：台灣大學 OR &quot;AI模型&quot; ext:docx modified:&gt;=2024-01-01（Ctrl+K）"
+             FontSize="16"
+             TextChanged="OnSearchTextChanged"
+             PreviewKeyDown="OnPreviewKeyDown" />
+
+    <Grid Grid.Row="1" ColumnSpacing="12">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="*" />
+        <ColumnDefinition Width="Auto" />
+      </Grid.ColumnDefinitions>
+      <TextBlock x:Name="ErrorText" Foreground="{ThemeResource SystemFillColorCriticalBrush}" TextWrapping="Wrap" Visibility="Collapsed" />
+      <TextBlock x:Name="StatusText" Grid.Column="1" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+    </Grid>
+
+    <Grid Grid.Row="2" ColumnSpacing="12">
+      <Grid.ColumnDefinitions>
+        <ColumnDefinition Width="5*" />
+        <ColumnDefinition Width="4*" />
+      </Grid.ColumnDefinitions>
+
+      <ListView x:Name="ResultList"
+                SelectionMode="Single"
+                IsItemClickEnabled="False"
+                SelectionChanged="OnResultSelectionChanged"
+                DoubleTapped="OnResultDoubleTapped"
+                PreviewKeyDown="OnPreviewKeyDown"
+                BorderThickness="1"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                CornerRadius="4">
+        <ListView.ItemsPanel>
+          <ItemsPanelTemplate>
+            <ItemsStackPanel />
+          </ItemsPanelTemplate>
+        </ListView.ItemsPanel>
+        <ListView.ItemTemplate>
+          <DataTemplate x:DataType="vm:ResultItemViewModel">
+            <Grid Padding="0,6" ColumnSpacing="12">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+              </Grid.ColumnDefinitions>
+              <StackPanel>
+                <TextBlock Text="{x:Bind FileName}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{x:Bind Directory}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+              <StackPanel Grid.Column="1" HorizontalAlignment="Right">
+                <TextBlock Text="{x:Bind ModifiedText}" FontSize="12" HorizontalAlignment="Right" />
+                <TextBlock FontSize="12" HorizontalAlignment="Right" Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                  <Run Text="{x:Bind SizeText}" />
+                  <Run Text=" · 分數 " />
+                  <Run Text="{x:Bind ScoreText}" />
+                </TextBlock>
+              </StackPanel>
+            </Grid>
+          </DataTemplate>
+        </ListView.ItemTemplate>
+      </ListView>
+
+      <Border Grid.Column="1"
+              BorderThickness="1"
+              BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+              Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+              CornerRadius="4"
+              Padding="12">
+        <ScrollViewer>
+          <StackPanel x:Name="PreviewPanel" Spacing="10" />
+        </ScrollViewer>
+      </Border>
+    </Grid>
+  </Grid>
+</UserControl>

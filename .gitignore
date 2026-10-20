@@ -482,3 +482,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# The Uno project folder is named LocalSeek.App; it is not a macOS bundle (*.app above, matched case-insensitively).
+!src/LocalSeek.App/
+!src/LocalSeek.App/Properties/PublishProfiles/*.pubxml

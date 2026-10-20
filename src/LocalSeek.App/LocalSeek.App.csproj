@@ -1,0 +1,28 @@
+<Project Sdk="Uno.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net9.0-windows10.0.19041</TargetFrameworks>
+
+    <OutputType>Exe</OutputType>
+    <UnoSingleProject>true</UnoSingleProject>
+    <!-- Unpackaged WinAppSDK deployment -->
+    <WindowsPackageType>None</WindowsPackageType>
+
+    <ApplicationTitle>LocalSeek</ApplicationTitle>
+    <ApplicationId>com.localseek.app</ApplicationId>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationPublisher>LocalSeek</ApplicationPublisher>
+    <Description>LocalSeek full-text search desktop tool.</Description>
+
+    <!--
+      UnoFeatures are used to quickly add and manage features enabled for your app.
+      https://aka.platform.uno/singleproject-features
+    -->
+    <UnoFeatures></UnoFeatures>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\LocalSeek.App.ViewModels\LocalSeek.App.ViewModels.csproj" />
+  </ItemGroup>
+
+</Project>
