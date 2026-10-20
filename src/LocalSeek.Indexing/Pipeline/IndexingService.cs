@@ -7,12 +7,26 @@ namespace LocalSeek.Indexing.Pipeline;
 
 public sealed record IndexingStatus(bool Paused, bool Busy, int Pending, long Processed, double FilesPerSecond, IReadOnlyList<string> UnwatchedRoots);
 
+/// <summary>What the UI needs from background indexing.</summary>
+public interface IIndexingController
+{
+    event EventHandler<IndexingStatus>? StatusChanged;
+
+    IndexingStatus Status { get; }
+
+    void Pause();
+
+    void Resume();
+
+    void Rescan();
+}
+
 /// <summary>
 /// Runs an <see cref="IndexingEngine"/> in the background: one watcher per root (roots on network drives
 /// or whose watcher cannot start fall back to a periodic difference scan), a start-up scan, debounced
 /// processing, background merges, and pause/resume. All waiting goes through the injected TimeProvider.
 /// </summary>
-public sealed class IndexingService : IAsyncDisposable
+public sealed class IndexingService : IIndexingController, IAsyncDisposable
 {
     private readonly IndexingEngine _engine;
     private readonly IndexWriter _writer;

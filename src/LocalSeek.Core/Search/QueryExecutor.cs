@@ -258,7 +258,16 @@ public sealed class QueryExecutor
 
     private void Accumulate(int[] tf, TermSpace space, string term, int weight)
     {
-        _index.ForEachPosting(space, term, (doc, frequency) => tf[doc] += weight * frequency);
+        var seen = 0;
+        _index.ForEachPosting(space, term, (doc, frequency) =>
+        {
+            if ((++seen % CancellationCheckInterval) == 0)
+            {
+                _cancellation.ThrowIfCancellationRequested();
+            }
+
+            tf[doc] += weight * frequency;
+        });
     }
 
     /// <summary>Counts start positions s where Terms[i] occurs at s + i for every i.</summary>
@@ -272,8 +281,14 @@ public sealed class QueryExecutor
             _cancellation.ThrowIfCancellationRequested();
             var byDoc = new Dictionary<int, int[]>();
             var previous = candidates;
+            var seen = 0;
             _index.ForEachPositions(space, term, (doc, positions) =>
             {
+                if ((++seen % CancellationCheckInterval) == 0)
+                {
+                    _cancellation.ThrowIfCancellationRequested();
+                }
+
                 if (previous is null || previous.ContainsKey(doc))
                 {
                     byDoc[doc] = positions.ToArray();
@@ -287,8 +302,14 @@ public sealed class QueryExecutor
             }
         }
 
+        var checkedDocs = 0;
         foreach (var doc in candidates!.Keys)
         {
+            if ((++checkedDocs % 1024) == 0)
+            {
+                _cancellation.ThrowIfCancellationRequested();
+            }
+
             var count = 0;
             foreach (var start in positionsByTerm[terms[0]][doc])
             {

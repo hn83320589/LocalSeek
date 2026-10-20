@@ -37,6 +37,7 @@ public sealed class IndexingEngine
     private long _bodyAnalyses;
     private long _processed;
     private int _sinceCommit;
+    private bool _pruneOutsideRoots;
 
     public IndexingEngine(IndexWriter writer, ISourceFileSystem fileSystem, ContentExtractor extractor, DiagnosticsLog diagnostics, TimeProvider time, IndexingOptions options)
     {
@@ -108,11 +109,16 @@ public sealed class IndexingEngine
         }
     }
 
+    /// <summary>Scans every root and drops indexed documents that are no longer under any root.</summary>
     public void RequestFullScan()
     {
-        foreach (var root in Options.Roots)
+        lock (_lock)
         {
-            RequestScan(root);
+            _pruneOutsideRoots = true;
+            foreach (var root in Options.Roots)
+            {
+                _rootsToScan.Add(root);
+            }
         }
     }
 
@@ -123,8 +129,11 @@ public sealed class IndexingEngine
         List<string> paths;
         Dictionary<string, string> hints;
         Dictionary<string, int> lockAttempts;
+        bool prune;
         lock (_lock)
         {
+            prune = _pruneOutsideRoots;
+            _pruneOutsideRoots = false;
             roots = [.. _rootsToScan];
             _rootsToScan.Clear();
             var now = _time.GetUtcNow();
@@ -146,6 +155,16 @@ public sealed class IndexingEngine
         }
 
         var handled = 0;
+        if (prune)
+        {
+            foreach (var entry in _writer.GetEntries().Where(e => RootOf(e.Path) is null))
+            {
+                _writer.Delete(entry.Path);
+                _diagnostics.Clear(entry.Path);
+                handled++;
+            }
+        }
+
         foreach (var root in roots)
         {
             handled += await ScanRootAsync(root, cancellation).ConfigureAwait(false);
