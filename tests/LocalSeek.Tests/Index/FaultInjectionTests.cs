@@ -71,6 +71,18 @@ public class FaultInjectionTests
                 w.AddOrUpdate(Doc(@"C:\new\after.txt", "after"));
                 w.Commit();
             }),
+        // Merging rewrites segments (incl. renamed docs whose content lives elsewhere) without changing content.
+        new(
+            "merge",
+            w =>
+            {
+                Base(w);
+                w.Rename(@"C:\base\2.txt", @"C:\moved\2.txt", 10, T0);
+                w.Delete(@"C:\base\3.txt");
+                w.AddOrUpdate(Doc(@"C:\base\third.txt", "third segment"));
+                w.Commit();
+            },
+            w => Assert.True(w.ForceMerge())),
         new("auto-flush", Base, w =>
         {
             for (var i = 0; i < 25; i++)
@@ -119,8 +131,26 @@ public class FaultInjectionTests
             reopened.Commit();
         }
 
-        Assert.Contains("before", outcomes);
-        Assert.Contains("after", outcomes);
+        if (before != after)
+        {
+            Assert.Contains("before", outcomes);
+            Assert.Contains("after", outcomes);
+        }
+    }
+
+    [Fact]
+    public void Merge_scenario_really_rewrites_segments()
+    {
+        var storage = new FakeIndexStorage();
+        using var writer = IndexWriter.Open(storage, SmallBuffer);
+        var scenario = Scenarios.Single(s => s.Name == "merge");
+        scenario.Setup(writer);
+        var segmentsBefore = writer.GetStatistics().SegmentCount;
+
+        scenario.Operation(writer);
+
+        Assert.True(segmentsBefore >= 3);
+        Assert.Equal(1, writer.GetStatistics().SegmentCount);
     }
 
     [Fact]

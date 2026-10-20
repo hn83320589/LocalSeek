@@ -33,6 +33,9 @@ public sealed class IndexWriter : IDisposable
     private bool _dirty;
     private bool _failed;
     private bool _disposed;
+    private bool _merging;
+    private int _mergesCompleted;
+    private int _mergesAborted;
 
     private IndexWriter(IIndexStorage storage, IndexWriterOptions options)
     {
@@ -115,7 +118,9 @@ public sealed class IndexWriter : IDisposable
                 _segments.Count,
                 _segments.Sum(s => s.DeletedCount),
                 _segments.Sum(s => s.Reader.FileLength),
-                _refs.PendingDeleteCount);
+                _refs.PendingDeleteCount,
+                _mergesCompleted,
+                _mergesAborted);
         }
     }
 
@@ -200,6 +205,16 @@ public sealed class IndexWriter : IDisposable
             }
         }
     }
+
+    /// <summary>
+    /// Runs one merge chosen by the merge policy, if any, and commits it. The expensive part runs outside
+    /// the writer lock, so documents can be added and committed meanwhile. Returns whether a merge was
+    /// committed (false also when it had to be abandoned because of a conflicting concurrent change).
+    /// </summary>
+    public bool MaybeMerge(CancellationToken cancellation = default) => RunMerge(forceAll: false, cancellation);
+
+    /// <summary>Merges all segments into one (also expunging every tombstone).</summary>
+    public bool ForceMerge(CancellationToken cancellation = default) => RunMerge(forceAll: true, cancellation);
 
     /// <summary>
     /// Reads every segment completely to verify its checksums. Damaged segments are dropped (their
@@ -420,6 +435,166 @@ public sealed class IndexWriter : IDisposable
         _refs.DecRef([IndexFileNames.Segment(state.Id)]);
     }
 
+    private bool RunMerge(bool forceAll, CancellationToken cancellation)
+    {
+        MergePlan? plan;
+        lock (_lock)
+        {
+            ThrowIfUnusable();
+            if (_merging)
+            {
+                return false;
+            }
+
+            plan = PlanMergeLocked(forceAll);
+            if (plan is null)
+            {
+                return false;
+            }
+
+            _merging = true;
+            _refs.IncRef(plan.InputFiles);
+        }
+
+        var name = IndexFileNames.Segment(plan.OutputId);
+        try
+        {
+            SegmentMerger.Result result;
+            try
+            {
+                result = SegmentMerger.Merge(_storage, name, plan.OutputId, plan.Inputs, cancellation);
+            }
+            catch
+            {
+                _refs.DeleteUnreferenced(name);
+                throw;
+            }
+
+            lock (_lock)
+            {
+                ThrowIfUnusable();
+                return CommitMergeLocked(plan, name, result);
+            }
+        }
+        finally
+        {
+            lock (_lock)
+            {
+                _merging = false;
+                if (!_disposed)
+                {
+                    _refs.DecRef(plan.InputFiles);
+                }
+            }
+        }
+    }
+
+    private MergePlan? PlanMergeLocked(bool forceAll)
+    {
+        IReadOnlyList<long>? selected = forceAll
+            ? (_segments.Count > 1 || _segments.Any(s => s.DeletedCount > 0) ? _segments.Select(s => s.Id).ToList() : null)
+            : _options.MergePolicy.Select(_segments.Select(s => (s.Id, s.Reader.Docs.Count, s.LiveCount)).ToList());
+        if (selected is null || selected.Count == 0)
+        {
+            return null;
+        }
+
+        // A content may only move if every live document referring to it moves too (or is still buffered,
+        // in which case it is re-pointed at commit). Pull in the segments of outside owners.
+        var ids = selected.ToHashSet();
+        bool grew;
+        do
+        {
+            grew = false;
+            foreach (var location in _live.Values)
+            {
+                if (location.SegmentId != _builder.SegmentId && !ids.Contains(location.SegmentId) && ids.Contains(GetDoc(location).ContentSegment))
+                {
+                    ids.Add(location.SegmentId);
+                    grew = true;
+                }
+            }
+        }
+        while (grew);
+
+        var states = _segments.Where(s => ids.Contains(s.Id)).ToList();
+        var owned = states.ToDictionary(s => s.Id, s => new BitArray(s.Reader.Contents.Count));
+        foreach (var location in _live.Values)
+        {
+            var doc = GetDoc(location);
+            if (owned.TryGetValue(doc.ContentSegment, out var bits))
+            {
+                bits[doc.ContentId] = true;
+            }
+        }
+
+        var inputs = states
+            .Select(s => new SegmentMerger.Input(s.Reader, new BitArray(s.Deleted).Not(), owned[s.Id]))
+            .ToList();
+        return new MergePlan(_nextSegmentId++, states, inputs, states.Select(s => IndexFileNames.Segment(s.Id)).ToArray());
+    }
+
+    private bool CommitMergeLocked(MergePlan plan, string name, SegmentMerger.Result result)
+    {
+        var inputIndex = plan.States.Select((s, i) => (s.Id, i)).ToDictionary(x => x.Id, x => x.i);
+        var stale = plan.States.Any(s => !_byId.TryGetValue(s.Id, out var current) || !ReferenceEquals(current, s))
+            || _live.Values.Any(l => l.SegmentId != _builder.SegmentId && !inputIndex.ContainsKey(l.SegmentId) && inputIndex.ContainsKey(GetDoc(l).ContentSegment));
+        if (stale)
+        {
+            _mergesAborted++;
+            _refs.DeleteUnreferenced(name);
+            return false;
+        }
+
+        try
+        {
+            var reader = SegmentReader.Open(_storage, name);
+            _refs.Register(name, reader);
+
+            // Carry over deletions that happened while the merge was running.
+            var deleted = new BitArray(result.DocCount);
+            for (var i = 0; i < plan.States.Count; i++)
+            {
+                for (var d = 0; d < result.DocMap[i].Length; d++)
+                {
+                    var mapped = result.DocMap[i][d];
+                    if (mapped >= 0 && plan.States[i].Deleted[d])
+                    {
+                        deleted[mapped] = true;
+                    }
+                }
+
+                _builder.RemapContents(plan.States[i].Id, result.ContentMap[i], plan.OutputId);
+            }
+
+            foreach (var (path, location) in _live.Where(kv => inputIndex.ContainsKey(kv.Value.SegmentId)).ToList())
+            {
+                var mapped = result.DocMap[inputIndex[location.SegmentId]][location.DocId];
+                _live[path] = mapped >= 0
+                    ? new DocLocation(plan.OutputId, mapped)
+                    : throw new InvalidOperationException($"Live document {path} was not carried by the merge.");
+            }
+
+            foreach (var state in plan.States)
+            {
+                RemoveSegment(state);
+            }
+
+            var output = new SegmentState(reader, deleted, deletionGeneration: 0);
+            output.DeletionsDirty = output.DeletedCount > 0;
+            AddSegment(output);
+            _dirty = true;
+            CommitLocked();
+            _mergesCompleted++;
+            return true;
+        }
+        catch
+        {
+            _failed = true;
+            throw;
+        }
+    }
+
     /// <summary>Removes every live document stored in, or whose content lives in, the segment.</summary>
     private int DropSegmentLocked(SegmentState segment)
     {
@@ -601,6 +776,8 @@ public sealed class IndexWriter : IDisposable
         || name.EndsWith(IndexFileNames.TempSuffix, StringComparison.Ordinal);
 
     private readonly record struct DocLocation(long SegmentId, int DocId);
+
+    private sealed record MergePlan(long OutputId, IReadOnlyList<SegmentState> States, IReadOnlyList<SegmentMerger.Input> Inputs, string[] InputFiles);
 
     private sealed class SegmentState(SegmentReader reader, BitArray deleted, long deletionGeneration)
     {

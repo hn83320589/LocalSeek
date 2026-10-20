@@ -7,6 +7,8 @@ public sealed record IndexWriterOptions
 
     /// <summary>How many most recent commit points keep their files (fallback if the newest is damaged).</summary>
     public int RetainedCommits { get; init; } = 2;
+
+    public MergePolicy MergePolicy { get; init; } = new();
 }
 
 /// <summary>A document whose fields are already tokenized (done in parallel outside the writer lock).</summary>
@@ -40,4 +42,4 @@ public sealed record IndexOpenReport(IReadOnlyList<IndexIssue> Issues)
     public bool FullRebuildRequired => Issues.Any(i => i.Kind == IndexIssueKind.FullRebuildRequired);
 }
 
-public sealed record IndexStatistics(long Generation, int LiveDocuments, int SegmentCount, int DeletedDocuments, long IndexBytes, int PendingFileDeletes);
+public sealed record IndexStatistics(long Generation, int LiveDocuments, int SegmentCount, int DeletedDocuments, long IndexBytes, int PendingFileDeletes, int MergesCompleted, int MergesAborted);

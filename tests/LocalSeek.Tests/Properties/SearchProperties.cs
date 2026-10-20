@@ -2,6 +2,7 @@ using LocalSeek.Core.Index;
 using LocalSeek.Core.Query;
 using LocalSeek.Core.Search;
 using LocalSeek.Tests.Reference;
+using static LocalSeek.Tests.Properties.Oracle;
 
 namespace LocalSeek.Tests.Properties;
 
@@ -26,48 +27,6 @@ public class SearchProperties
     }
 
     private static readonly Lazy<Fixture> Corpus = new(() => Fixture.Create(seed: 5000, count: 320));
-
-    /// <summary>Binds with both binders; returns false when both reject the query.</summary>
-    private static bool TryBindBoth(string query, out BoundNode engine, out BoundNode reference)
-    {
-        QueryNode syntax;
-        try
-        {
-            syntax = QueryParser.Parse(query);
-        }
-        catch (QuerySyntaxException)
-        {
-            engine = reference = null!;
-            return false;
-        }
-
-        BoundNode? e = null, r = null;
-        QuerySyntaxException? engineError = null, referenceError = null;
-        try
-        {
-            e = QueryBinder.Bind(syntax);
-        }
-        catch (QuerySyntaxException ex)
-        {
-            engineError = ex;
-        }
-
-        try
-        {
-            r = ReferenceEngine.Bind(syntax);
-        }
-        catch (QuerySyntaxException ex)
-        {
-            referenceError = ex;
-        }
-
-        Assert.True(
-            (engineError is null) == (referenceError is null),
-            $"Binders disagree on '{query}': engine={engineError?.Message ?? e!.ToString()} reference={referenceError?.Message ?? r!.ToString()}");
-        engine = e!;
-        reference = r!;
-        return engineError is null;
-    }
 
     [Fact]
     public void Boolean_hit_sets_match_reference()

@@ -29,8 +29,12 @@ public sealed class FakeIndexStorage : IIndexStorage
 
     public List<string> Log { get; } = [];
 
+    /// <summary>Called (outside the storage lock) before a file is created; lets tests interleave work.</summary>
+    public Action<string>? OnCreate { get; set; }
+
     public IIndexOutput Create(string name)
     {
+        OnCreate?.Invoke(name);
         lock (_lock)
         {
             Operation($"create {name}");

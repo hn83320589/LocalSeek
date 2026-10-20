@@ -72,6 +72,25 @@ internal sealed class SegmentBuilder(long segmentId)
         return id;
     }
 
+    /// <summary>Re-points docs whose content moved (a merge committed while they were buffered).</summary>
+    public void RemapContents(long fromSegment, int[] contentMap, long toSegment)
+    {
+        for (var i = 0; i < _docs.Count; i++)
+        {
+            var doc = _docs[i];
+            if (doc.ContentSegment == fromSegment)
+            {
+                var mapped = contentMap[doc.ContentId];
+                if (mapped < 0)
+                {
+                    throw new InvalidOperationException($"Buffered document {doc.Path} references a content dropped by a merge.");
+                }
+
+                _docs[i] = doc with { ContentSegment = toSegment, ContentId = mapped };
+            }
+        }
+    }
+
     public void WriteTo(IIndexOutput output)
     {
         var writer = new SegmentWriter(output, SegmentId, _contents, _docs);
