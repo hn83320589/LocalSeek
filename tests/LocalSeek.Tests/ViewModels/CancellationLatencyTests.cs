@@ -26,23 +26,28 @@ public class CancellationLatencyTests
     });
 
     /// <summary>Many common phrases: slow enough that cancellation lands mid-execution.</summary>
-    private static readonly string HeavyQuery = string.Join(" OR ", Enumerable.Range(0, 30).Select(i => $"\"w{i} w{(i + 1) % 40} w{(i + 2) % 40}\""));
+    private static readonly string HeavyQuery = string.Join(" OR ", Enumerable.Range(0, 120).Select(i => $"\"w{i % 40} w{(i + 1 + (i / 40)) % 40} w{(i + 2) % 40}\""));
 
     [Fact]
     public async Task Cancellation_takes_effect_within_50_ms()
     {
         var service = new IndexSearchService(() => Index.Value, TimeZoneInfo.Utc);
+
+        // Build the index and JIT the query path first so the baseline measures the query alone.
+        await service.SearchAsync(HeavyQuery, CancellationToken.None);
         var baseline = Stopwatch.StartNew();
         await service.SearchAsync(HeavyQuery, CancellationToken.None);
         baseline.Stop();
-        Assert.True(baseline.ElapsedMilliseconds > 100, $"Query too fast ({baseline.ElapsedMilliseconds} ms) to measure cancellation.");
+        Assert.True(baseline.ElapsedMilliseconds >= 200, $"Query too fast ({baseline.ElapsedMilliseconds} ms) to measure cancellation.");
 
         var latencies = new List<long>();
         for (var attempt = 0; attempt < 5; attempt++)
         {
             using var cancellation = new CancellationTokenSource();
             var search = service.SearchAsync(HeavyQuery, cancellation.Token);
-            await Task.Delay(30);
+
+            // Cancel while the search is certainly still running.
+            await Task.Delay(TimeSpan.FromMilliseconds(baseline.ElapsedMilliseconds / 4.0));
             var stopwatch = Stopwatch.StartNew();
             await cancellation.CancelAsync();
             await Assert.ThrowsAnyAsync<OperationCanceledException>(() => search);
