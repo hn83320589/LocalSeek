@@ -97,8 +97,14 @@ public sealed class SettingsStore(string filePath)
 /// <summary>Where LocalSeek keeps its data: %LocalAppData%\LocalSeek\.</summary>
 public sealed record AppPaths(string Root)
 {
+    public const string OverrideVariable = "LOCALSEEK_DATA_DIR";
+
     public static AppPaths Default { get; } =
         new(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LocalSeek"));
+
+    /// <summary>The default location, unless LOCALSEEK_DATA_DIR points elsewhere (demos, measurements).</summary>
+    public static AppPaths FromEnvironment() =>
+        Environment.GetEnvironmentVariable(OverrideVariable) is { Length: > 0 } custom ? new AppPaths(custom) : Default;
 
     public string SettingsFile => Path.Combine(Root, "settings.json");
 
