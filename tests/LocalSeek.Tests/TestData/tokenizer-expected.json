@@ -1,0 +1,185 @@
+{
+  "_format": "tokens: [text, kind, position, sourceStart, sourceEnd]; cjkChars: [char, sourceStart, sourceEnd]; ranges are UTF-16 [start, end) in the input",
+  "cases": [
+    {
+      "name": "latin-basic",
+      "input": "Hello World",
+      "tokens": [["hello", "Latin", 0, 0, 5], ["world", "Latin", 1, 6, 11]],
+      "cjkChars": []
+    },
+    {
+      "name": "fullwidth-to-halfwidth",
+      "input": "ＡＢＣ１２３",
+      "tokens": [["abc123", "Latin", 0, 0, 6]],
+      "cjkChars": []
+    },
+    {
+      "name": "case-folding",
+      "input": "MiXeD CASE",
+      "tokens": [["mixed", "Latin", 0, 0, 5], ["case", "Latin", 1, 6, 10]],
+      "cjkChars": []
+    },
+    {
+      "name": "tai-variant",
+      "input": "臺北",
+      "tokens": [["台北", "CjkBigram", 0, 0, 2]],
+      "cjkChars": [["台", 0, 1], ["北", 1, 2]]
+    },
+    {
+      "name": "latin-cjk-mixed",
+      "input": "AI模型",
+      "tokens": [["ai", "Latin", 0, 0, 2], ["模型", "CjkBigram", 1, 2, 4]],
+      "cjkChars": [["模", 2, 3], ["型", 3, 4]]
+    },
+    {
+      "name": "cjk-single",
+      "input": "我 是",
+      "tokens": [["我", "CjkSingle", 0, 0, 1], ["是", "CjkSingle", 1, 2, 3]],
+      "cjkChars": [["我", 0, 1], ["是", 2, 3]]
+    },
+    {
+      "name": "cjk-run-of-three",
+      "input": "資料庫",
+      "tokens": [["資料", "CjkBigram", 0, 0, 2], ["料庫", "CjkBigram", 1, 1, 3]],
+      "cjkChars": [["資", 0, 1], ["料", 1, 2], ["庫", 2, 3]]
+    },
+    {
+      "name": "position-after-cjk-run",
+      "input": "資料庫abc",
+      "tokens": [["資料", "CjkBigram", 0, 0, 2], ["料庫", "CjkBigram", 1, 1, 3], ["abc", "Latin", 2, 3, 6]],
+      "cjkChars": [["資", 0, 1], ["料", 1, 2], ["庫", 2, 3]]
+    },
+    {
+      "name": "surrogate-pair",
+      "input": "𠮷野家",
+      "tokens": [["𠮷野", "CjkBigram", 0, 0, 3], ["野家", "CjkBigram", 1, 2, 4]],
+      "cjkChars": [["𠮷", 0, 2], ["野", 2, 3], ["家", 3, 4]]
+    },
+    {
+      "name": "punctuation-breaks-cjk-run",
+      "input": "台灣，大學",
+      "tokens": [["台灣", "CjkBigram", 0, 0, 2], ["大學", "CjkBigram", 1, 3, 5]],
+      "cjkChars": [["台", 0, 1], ["灣", 1, 2], ["大", 3, 4], ["學", 4, 5]]
+    },
+    {
+      "name": "ascii-separators",
+      "input": "a-b_c.d",
+      "tokens": [["a", "Latin", 0, 0, 1], ["b", "Latin", 1, 2, 3], ["c", "Latin", 2, 4, 5], ["d", "Latin", 3, 6, 7]],
+      "cjkChars": []
+    },
+    {
+      "name": "compat-parenthesized-ideograph",
+      "input": "㈱台",
+      "tokens": [["株", "CjkSingle", 0, 0, 1], ["台", "CjkSingle", 1, 1, 2]],
+      "cjkChars": [["株", 0, 1], ["台", 1, 2]]
+    },
+    {
+      "name": "ligature",
+      "input": "ﬁle",
+      "tokens": [["file", "Latin", 0, 0, 3]],
+      "cjkChars": []
+    },
+    {
+      "name": "kana-is-separator",
+      "input": "カタカナ漢字",
+      "tokens": [["漢字", "CjkBigram", 0, 4, 6]],
+      "cjkChars": [["漢", 4, 5], ["字", 5, 6]]
+    },
+    {
+      "name": "only-punctuation",
+      "input": "!!!，。",
+      "tokens": [],
+      "cjkChars": []
+    },
+    {
+      "name": "alphanumeric-run",
+      "input": "abc123def",
+      "tokens": [["abc123def", "Latin", 0, 0, 9]],
+      "cjkChars": []
+    },
+    {
+      "name": "cjk-extension-a",
+      "input": "㐀㐁",
+      "tokens": [["㐀㐁", "CjkBigram", 0, 0, 2]],
+      "cjkChars": [["㐀", 0, 1], ["㐁", 1, 2]]
+    },
+    {
+      "name": "compat-ideograph-normalized-into-range",
+      "input": "豈",
+      "tokens": [["豈", "CjkSingle", 0, 0, 1]],
+      "cjkChars": [["豈", 0, 1]]
+    },
+    {
+      "name": "ideographic-space",
+      "input": "中文　English",
+      "tokens": [["中文", "CjkBigram", 0, 0, 2], ["english", "Latin", 1, 3, 10]],
+      "cjkChars": [["中", 0, 1], ["文", 1, 2]]
+    },
+    {
+      "name": "outside-cjk-range-is-separator",
+      "input": "𰀀",
+      "tokens": [],
+      "cjkChars": []
+    },
+    {
+      "name": "square-era-expands-to-two-ideographs",
+      "input": "㍻年",
+      "tokens": [["平成", "CjkBigram", 0, 0, 1], ["成年", "CjkBigram", 1, 0, 2]],
+      "cjkChars": [["平", 0, 1], ["成", 0, 1], ["年", 1, 2]]
+    },
+    {
+      "name": "combining-mark-composes-to-non-latin",
+      "input": "café",
+      "tokens": [["caf", "Latin", 0, 0, 3]],
+      "cjkChars": []
+    },
+    {
+      "name": "fullwidth-latin-then-cjk",
+      "input": "ＡＩ模型",
+      "tokens": [["ai", "Latin", 0, 0, 2], ["模型", "CjkBigram", 1, 2, 4]],
+      "cjkChars": [["模", 2, 3], ["型", 3, 4]]
+    },
+    {
+      "name": "punctuation-does-not-shift-position",
+      "input": "我。AI",
+      "tokens": [["我", "CjkSingle", 0, 0, 1], ["ai", "Latin", 1, 2, 4]],
+      "cjkChars": [["我", 0, 1]]
+    },
+    {
+      "name": "superscript-digit",
+      "input": "x²",
+      "tokens": [["x2", "Latin", 0, 0, 2]],
+      "cjkChars": []
+    },
+    {
+      "name": "roman-numeral-expands",
+      "input": "Ⅻ",
+      "tokens": [["xii", "Latin", 0, 0, 1]],
+      "cjkChars": []
+    },
+    {
+      "name": "kangxi-radical",
+      "input": "⼈",
+      "tokens": [["人", "CjkSingle", 0, 0, 1]],
+      "cjkChars": [["人", 0, 1]]
+    },
+    {
+      "name": "singles-and-latin-interleaved",
+      "input": "一a二",
+      "tokens": [["一", "CjkSingle", 0, 0, 1], ["a", "Latin", 1, 1, 2], ["二", "CjkSingle", 2, 2, 3]],
+      "cjkChars": [["一", 0, 1], ["二", 2, 3]]
+    },
+    {
+      "name": "positions-across-long-run",
+      "input": "abc 一二三四 def",
+      "tokens": [
+        ["abc", "Latin", 0, 0, 3],
+        ["一二", "CjkBigram", 1, 4, 6],
+        ["二三", "CjkBigram", 2, 5, 7],
+        ["三四", "CjkBigram", 3, 6, 8],
+        ["def", "Latin", 4, 9, 12]
+      ],
+      "cjkChars": [["一", 4, 5], ["二", 5, 6], ["三", 6, 7], ["四", 7, 8]]
+    }
+  ]
+}
