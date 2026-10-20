@@ -3,7 +3,7 @@ using LocalSeek.Core.Query;
 namespace LocalSeek.Core.Index;
 
 /// <summary>A document to be indexed: metadata plus the extracted body text.</summary>
-public sealed record DocumentInput(string Path, long Size, DateTime LastWriteUtc, string Body);
+public sealed record DocumentInput(string Path, long Size, DateTime LastWriteUtc, string Body, ulong ContentHash = 0);
 
 /// <summary>
 /// Simple in-memory implementation of <see cref="IIndexReader"/>. Used directly in tests and as the
