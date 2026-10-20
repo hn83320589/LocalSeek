@@ -408,3 +408,15 @@ public interface IIndexStorage
 3. **NFKC 分段近似**：以「base + 組合記號」為正規化單元，少數跨單元組合（如諺文 Jamo 組字）的座標會偏寬，但都屬分隔符，不影響詞元。
 4. **Uno.Sdk 在 CI 的建置**：需在 windows runner 驗證 WinAppSDK unpackaged 發佈，列為 M0 首要風險。
 5. **Watcher 延遲期間**：檔案刪除到 commit 之間（≤ ~2 秒）的查詢統計值仍含該檔；顯示層做存在性檢查補強。
+
+---
+
+## 12. 實作後的差異（2026-10-20 補記）
+
+| 項目 | 設計草案 | 最終實作與原因 |
+|---|---|---|
+| Postings / Positions | 兩個獨立 section | 合併為一個 section，每個詞的 postings 後面緊接 positions。片段可以串流寫入（合併時記憶體有上限），AND 查詢仍只讀 postings 那一段 |
+| 合併時的「收養」 | 合併結果收養集合外的擁有文件 | 改為 closure（選取片段時一併納入擁有文件所在的片段）；合併期間的新參照若還在 RAM 中就重新指向，若已提交則放棄這次合併、下次重試。邏輯較簡單，且不需要在別的片段重新分詞檔名 |
+| 片語執行 | positions 交集 | 先用 postings 求候選文件，再只解碼候選文件的 positions（P95 從 118 ms 降到 43 ms） |
+| 資料位置 | 固定 `%LocalAppData%\LocalSeek` | 預設不變；另外可用環境變數 `LOCALSEEK_DATA_DIR` 覆寫，供展示與效能量測 |
+| 鎖定檔重試 | 1、2、4 秒 | 相同；三次後記為「持續被鎖定」，等下次變更或掃描時再試 |

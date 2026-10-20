@@ -126,6 +126,23 @@ public sealed class SearchViewModelTests : IDisposable
     }
 
     [Fact]
+    public void Error_position_is_already_set_when_the_message_changes()
+    {
+        var seen = new List<int>();
+        _vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SearchViewModel.ErrorMessage))
+            {
+                seen.Add(_vm.ErrorPosition);
+            }
+        };
+
+        Type("台灣 AND (模型").Completion.SetResult(new SearchOutcome.Invalid("缺少右括號", 7, 1));
+
+        Assert.Equal([7], seen);
+    }
+
+    [Fact]
     public void Clearing_the_query_clears_results_without_searching()
     {
         Type("apple").Complete(@"C:\a.txt");

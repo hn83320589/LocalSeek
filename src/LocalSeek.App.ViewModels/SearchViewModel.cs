@@ -239,10 +239,11 @@ public sealed partial class SearchViewModel : ObservableObject, IDisposable
         {
             case SearchOutcome.Invalid invalid:
                 ClearResults();
-                ErrorMessage = invalid.Message;
+                // Position first: views render the message when it changes.
                 ErrorPosition = invalid.Position;
                 ErrorLength = invalid.Length;
-                StatusText = $"查詢有誤：{invalid.Message}（位置 {invalid.Position}）";
+                ErrorMessage = invalid.Message;
+                StatusText = $"查詢有誤：{invalid.Message}（第 {invalid.Position + 1} 個字元）";
                 break;
 
             case SearchOutcome.Success success:
