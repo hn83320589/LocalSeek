@@ -71,7 +71,7 @@ public sealed class MemoryIndex : IIndexReader
         }
     }
 
-    public void ForEachPositions(TermSpace space, string term, PositionsCallback callback)
+    public void ForEachPositions(TermSpace space, string term, PositionsCallback callback, Func<int, bool>? wanted = null)
     {
         if (!IsPositional(space, out var field))
         {
@@ -82,7 +82,10 @@ public sealed class MemoryIndex : IIndexReader
         {
             foreach (var (doc, positions) in list)
             {
-                callback(doc, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(positions));
+                if (wanted is null || wanted(doc))
+                {
+                    callback(doc, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(positions));
+                }
             }
         }
     }

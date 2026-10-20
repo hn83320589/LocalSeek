@@ -97,7 +97,7 @@ public sealed class IndexSnapshot : IIndexReader, IDisposable
         }
     }
 
-    public void ForEachPositions(TermSpace space, string term, PositionsCallback callback)
+    public void ForEachPositions(TermSpace space, string term, PositionsCallback callback, Func<int, bool>? wanted = null)
     {
         if (space is not (TermSpace.BodyTerm or TermSpace.NameTerm))
         {
@@ -114,14 +114,11 @@ public sealed class IndexSnapshot : IIndexReader, IDisposable
 
             var map = view.MapFor(space);
             var bytes = view.Reader.ReadPostingsAndPositions(entry);
-            PostingsDecoder.ReadWithPositions(bytes.AsSpan(0, entry.PostingsLength), bytes.AsSpan(entry.PostingsLength), (id, positions) =>
-            {
-                var ordinal = map[id];
-                if (ordinal >= 0)
-                {
-                    callback(ordinal, positions);
-                }
-            });
+            PostingsDecoder.ReadWithPositions(
+                bytes.AsSpan(0, entry.PostingsLength),
+                bytes.AsSpan(entry.PostingsLength),
+                (id, positions) => callback(map[id], positions),
+                id => map[id] >= 0 && (wanted is null || wanted(map[id])));
         }
     }
 

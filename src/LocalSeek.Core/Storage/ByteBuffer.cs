@@ -130,6 +130,27 @@ internal ref struct ByteReader(ReadOnlySpan<byte> data)
         throw new IndexCorruptException("varint 過長");
     }
 
+    /// <summary>Skips <paramref name="count"/> varints by scanning for bytes without the continuation bit.</summary>
+    public void SkipVarInts(int count)
+    {
+        var data = _data;
+        var position = Position;
+        while (count > 0)
+        {
+            if (position >= data.Length)
+            {
+                throw new IndexCorruptException("資料提前結束");
+            }
+
+            if (data[position++] < 0x80)
+            {
+                count--;
+            }
+        }
+
+        Position = position;
+    }
+
     public int ReadVarInt32()
     {
         var value = ReadVarUInt64();

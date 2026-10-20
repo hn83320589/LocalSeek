@@ -270,63 +270,129 @@ public sealed class QueryExecutor
         });
     }
 
-    /// <summary>Counts start positions s where Terms[i] occurs at s + i for every i.</summary>
+    /// <summary>
+    /// Counts start positions s where Terms[i] occurs at s + i for every i. Documents containing every
+    /// term are found from postings alone; positions are then decoded only for those documents.
+    /// </summary>
     private void AccumulatePhrase(int[] tf, TermSpace space, IReadOnlyList<string> terms, int weight)
     {
         var distinct = terms.Distinct(StringComparer.Ordinal).ToList();
-        Dictionary<int, int[]>? candidates = null;
-        var positionsByTerm = new Dictionary<string, Dictionary<int, int[]>>(StringComparer.Ordinal);
+        ulong[]? candidates = null;
         foreach (var term in distinct)
         {
             _cancellation.ThrowIfCancellationRequested();
-            var byDoc = new Dictionary<int, int[]>();
-            var previous = candidates;
+            var docs = new ulong[_words];
             var seen = 0;
-            _index.ForEachPositions(space, term, (doc, positions) =>
+            _index.ForEachPosting(space, term, (doc, _) =>
             {
                 if ((++seen % CancellationCheckInterval) == 0)
                 {
                     _cancellation.ThrowIfCancellationRequested();
                 }
 
-                if (previous is null || previous.ContainsKey(doc))
-                {
-                    byDoc[doc] = positions.ToArray();
-                }
+                docs[doc >> 6] |= 1UL << doc;
             });
-            positionsByTerm[term] = byDoc;
-            candidates = byDoc;
-            if (byDoc.Count == 0)
+
+            if (candidates is null)
+            {
+                candidates = docs;
+            }
+            else
+            {
+                for (var w = 0; w < _words; w++)
+                {
+                    candidates[w] &= docs[w];
+                }
+            }
+
+            if (Array.TrueForAll(candidates, w => w == 0))
             {
                 return;
             }
         }
 
-        var checkedDocs = 0;
-        foreach (var doc in candidates!.Keys)
+        var lists = new Dictionary<string, PositionLists>(StringComparer.Ordinal);
+        foreach (var term in distinct)
         {
-            if ((++checkedDocs % 1024) == 0)
-            {
-                _cancellation.ThrowIfCancellationRequested();
-            }
-
-            var count = 0;
-            foreach (var start in positionsByTerm[terms[0]][doc])
-            {
-                var all = true;
-                for (var i = 1; i < terms.Count && all; i++)
-                {
-                    all = Array.BinarySearch(positionsByTerm[terms[i]][doc], start + i) >= 0;
-                }
-
-                if (all)
-                {
-                    count++;
-                }
-            }
-
-            tf[doc] += weight * count;
+            _cancellation.ThrowIfCancellationRequested();
+            var list = new PositionLists(_index.DocCount);
+            _index.ForEachPositions(space, term, list.Add, doc => (candidates![doc >> 6] & (1UL << doc)) != 0);
+            lists[term] = list;
         }
+
+        var perTerm = terms.Select(t => lists[t]).ToArray();
+        var cursors = new int[perTerm.Length];
+        var checkedDocs = 0;
+        for (var w = 0; w < candidates!.Length; w++)
+        {
+            var bits = candidates[w];
+            while (bits != 0)
+            {
+                var doc = (w * 64) + BitOperations.TrailingZeroCount(bits);
+                bits &= bits - 1;
+                if ((++checkedDocs % 1024) == 0)
+                {
+                    _cancellation.ThrowIfCancellationRequested();
+                }
+
+                tf[doc] += weight * CountPhraseStarts(perTerm, doc, cursors);
+            }
+        }
+    }
+
+    /// <summary>Start positions s with perTerm[i] at s + i for all i; one forward pass over each sorted list.</summary>
+    private static int CountPhraseStarts(PositionLists[] perTerm, int doc, int[] cursors)
+    {
+        Array.Clear(cursors);
+        var first = perTerm[0].Of(doc);
+        var count = 0;
+        foreach (var start in first)
+        {
+            var all = true;
+            for (var i = 1; i < perTerm.Length && all; i++)
+            {
+                var positions = perTerm[i].Of(doc);
+                var target = start + i;
+                ref var cursor = ref cursors[i];
+                while (cursor < positions.Length && positions[cursor] < target)
+                {
+                    cursor++;
+                }
+
+                all = cursor < positions.Length && positions[cursor] == target;
+            }
+
+            if (all)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    /// <summary>Positions of one term for many documents, packed into one array.</summary>
+    private sealed class PositionLists(int documentCount)
+    {
+        private readonly int[] _start = new int[documentCount];
+        private readonly int[] _length = new int[documentCount];
+        private int[] _positions = new int[1024];
+        private int _count;
+
+        public void Add(int doc, ReadOnlySpan<int> positions)
+        {
+            if (_count + positions.Length > _positions.Length)
+            {
+                Array.Resize(ref _positions, Math.Max(_count + positions.Length, _positions.Length * 2));
+            }
+
+            positions.CopyTo(_positions.AsSpan(_count));
+            _start[doc] = _count;
+            _length[doc] = positions.Length;
+            _count += positions.Length;
+        }
+
+        public ReadOnlySpan<int> Of(int doc) => _positions.AsSpan(_start[doc], _length[doc]);
     }
 
     private static int CountPositive(int[] values)

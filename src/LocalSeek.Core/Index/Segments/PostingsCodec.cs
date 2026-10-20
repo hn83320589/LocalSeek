@@ -62,7 +62,8 @@ internal static class PostingsDecoder
         }
     }
 
-    public static void ReadWithPositions(ReadOnlySpan<byte> postings, ReadOnlySpan<byte> positions, PositionsVisitor visit)
+    /// <param name="wanted">When given, postings it rejects have their positions skipped without decoding.</param>
+    public static void ReadWithPositions(ReadOnlySpan<byte> postings, ReadOnlySpan<byte> positions, PositionsVisitor visit, Func<int, bool>? wanted = null)
     {
         var postingReader = new ByteReader(postings);
         var positionReader = new ByteReader(positions);
@@ -72,6 +73,11 @@ internal static class PostingsDecoder
         {
             id += postingReader.ReadVarInt32() + 1;
             var frequency = postingReader.ReadVarInt32();
+            if (wanted is not null && !wanted(id))
+            {
+                positionReader.SkipVarInts(frequency);
+                continue;
+            }
             if (buffer.Length < frequency)
             {
                 buffer = new int[Math.Max(frequency, buffer.Length * 2)];

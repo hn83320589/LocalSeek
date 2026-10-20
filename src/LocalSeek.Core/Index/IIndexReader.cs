@@ -41,8 +41,11 @@ public interface IIndexReader
     /// <summary>Raw (unweighted) frequency of the term per live document.</summary>
     void ForEachPosting(TermSpace space, string term, PostingCallback callback);
 
-    /// <summary>Sorted positions per live document; only for <see cref="TermSpace.BodyTerm"/> and <see cref="TermSpace.NameTerm"/>.</summary>
-    void ForEachPositions(TermSpace space, string term, PositionsCallback callback);
+    /// <summary>
+    /// Sorted positions per live document; only for <see cref="TermSpace.BodyTerm"/> and <see cref="TermSpace.NameTerm"/>.
+    /// When <paramref name="wanted"/> is given, documents it rejects are skipped without decoding their positions.
+    /// </summary>
+    void ForEachPositions(TermSpace space, string term, PositionsCallback callback, Func<int, bool>? wanted = null);
 
     /// <summary>Distinct terms in the space starting with the prefix, ordinal order.</summary>
     IReadOnlyList<string> GetTermsWithPrefix(TermSpace space, string prefix);
