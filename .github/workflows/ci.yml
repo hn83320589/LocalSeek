@@ -19,8 +19,10 @@ jobs:
         with:
           dotnet-version: 9.0.x
 
+      # Uno.Sdk adds the DevServer package for Debug restores, which refuses optimized builds,
+      # so restore must already use the Release configuration.
       - name: Restore
-        run: dotnet restore LocalSeek.sln
+        run: dotnet restore LocalSeek.sln -p:Configuration=Release
 
       - name: Build
         run: dotnet build LocalSeek.sln -c Release --no-restore
