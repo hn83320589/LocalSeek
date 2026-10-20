@@ -1,0 +1,476 @@
+{
+  "documentCount": 12,
+  "totalLength": 151,
+  "lengths": {
+    "01-utf8-nobom.txt": 16,
+    "02-utf8-bom.txt": 15,
+    "03-utf16.txt": 13,
+    "04-big5.txt": 14,
+    "05-page.html": 13,
+    "06-report.docx": 14,
+    "07-fullwidth.txt": 11,
+    "08-surrogate.txt": 11,
+    "09-compat.txt": 11,
+    "10-資料.csv": 10,
+    "11-notes.md": 10,
+    "12-模型手冊.txt": 13
+  },
+  "skipped": [
+    "13-binary.txt",
+    "14-unknown-encoding.txt"
+  ],
+  "queries": [
+    {
+      "id": "Q1",
+      "query": "模型",
+      "totalHits": 5,
+      "terms": [
+        {
+          "key": "term(模型)",
+          "df": 5,
+          "idf": 0.8602012652231114
+        }
+      ],
+      "hits": [
+        {
+          "file": "12-模型手冊.txt",
+          "score": 1.1718632778639229
+        },
+        {
+          "file": "10-資料.csv",
+          "score": 0.9390695376507315
+        },
+        {
+          "file": "07-fullwidth.txt",
+          "score": 0.9068830857096718
+        },
+        {
+          "file": "05-page.html",
+          "score": 0.848704663816803
+        },
+        {
+          "file": "01-utf8-nobom.txt",
+          "score": 0.774204444072386
+        }
+      ]
+    },
+    {
+      "id": "Q2",
+      "query": "資料",
+      "totalHits": 7,
+      "terms": [
+        {
+          "key": "term(資料)",
+          "df": 7,
+          "idf": 0.550046336919272
+        }
+      ],
+      "hits": [
+        {
+          "file": "11-notes.md",
+          "score": 0.904133563209214
+        },
+        {
+          "file": "10-資料.csv",
+          "score": 0.8026593152847887
+        },
+        {
+          "file": "09-compat.txt",
+          "score": 0.5798965189609081
+        },
+        {
+          "file": "03-utf16.txt",
+          "score": 0.5426949602749692
+        },
+        {
+          "file": "05-page.html",
+          "score": 0.5426949602749692
+        },
+        {
+          "file": "04-big5.txt",
+          "score": 0.5258284694232581
+        },
+        {
+          "file": "06-report.docx",
+          "score": 0.5258284694232581
+        }
+      ]
+    },
+    {
+      "id": "Q3",
+      "query": "臺灣",
+      "totalHits": 2,
+      "terms": [
+        {
+          "key": "term(台灣)",
+          "df": 2,
+          "idf": 1.6486586255873816
+        }
+      ],
+      "hits": [
+        {
+          "file": "03-utf16.txt",
+          "score": 1.6266242810220617
+        },
+        {
+          "file": "01-utf8-nobom.txt",
+          "score": 1.4838374300193127
+        }
+      ]
+    },
+    {
+      "id": "Q4",
+      "query": "AI",
+      "totalHits": 4,
+      "terms": [
+        {
+          "key": "term(ai)",
+          "df": 4,
+          "idf": 1.0608719606852626
+        }
+      ],
+      "hits": [
+        {
+          "file": "07-fullwidth.txt",
+          "score": 1.1184438760382236
+        },
+        {
+          "file": "05-page.html",
+          "score": 1.046693392752136
+        },
+        {
+          "file": "02-utf8-bom.txt",
+          "score": 0.983593818977517
+        },
+        {
+          "file": "01-utf8-nobom.txt",
+          "score": 0.9548135067451756
+        }
+      ]
+    },
+    {
+      "id": "Q5",
+      "query": "\"AI模型\"",
+      "totalHits": 3,
+      "terms": [
+        {
+          "key": "phrase(ai 模型)",
+          "df": 3,
+          "idf": 1.3121863889661687
+        }
+      ],
+      "hits": [
+        {
+          "file": "07-fullwidth.txt",
+          "score": 1.3833967579008608
+        },
+        {
+          "file": "05-page.html",
+          "score": 1.294649000340247
+        },
+        {
+          "file": "01-utf8-nobom.txt",
+          "score": 1.1810033010418892
+        }
+      ]
+    },
+    {
+      "id": "Q6",
+      "query": "模",
+      "totalHits": 5,
+      "terms": [
+        {
+          "key": "char(模)",
+          "df": 5,
+          "idf": 0.8602012652231114
+        }
+      ],
+      "hits": [
+        {
+          "file": "12-模型手冊.txt",
+          "score": 1.1718632778639229
+        },
+        {
+          "file": "10-資料.csv",
+          "score": 0.9390695376507315
+        },
+        {
+          "file": "07-fullwidth.txt",
+          "score": 0.9068830857096718
+        },
+        {
+          "file": "05-page.html",
+          "score": 0.848704663816803
+        },
+        {
+          "file": "01-utf8-nobom.txt",
+          "score": 0.774204444072386
+        }
+      ]
+    },
+    {
+      "id": "Q7",
+      "query": "𠮷野",
+      "totalHits": 1,
+      "terms": [
+        {
+          "key": "term(𠮷野)",
+          "df": 1,
+          "idf": 2.1594842493533726
+        }
+      ],
+      "hits": [
+        {
+          "file": "08-surrogate.txt",
+          "score": 2.2766761905274215
+        }
+      ]
+    },
+    {
+      "id": "Q8",
+      "query": "file",
+      "totalHits": 1,
+      "terms": [
+        {
+          "key": "term(file)",
+          "df": 1,
+          "idf": 2.1594842493533726
+        }
+      ],
+      "hits": [
+        {
+          "file": "09-compat.txt",
+          "score": 2.2766761905274215
+        }
+      ]
+    },
+    {
+      "id": "Q9",
+      "query": "da*",
+      "totalHits": 2,
+      "terms": [
+        {
+          "key": "prefix(da)",
+          "df": 2,
+          "idf": 1.6486586255873816
+        }
+      ],
+      "hits": [
+        {
+          "file": "07-fullwidth.txt",
+          "score": 1.7381288334501053
+        },
+        {
+          "file": "06-report.docx",
+          "score": 1.5760702026478512
+        }
+      ]
+    },
+    {
+      "id": "Q10",
+      "query": "株",
+      "totalHits": 1,
+      "terms": [
+        {
+          "key": "char(株)",
+          "df": 1,
+          "idf": 2.1594842493533726
+        }
+      ],
+      "hits": [
+        {
+          "file": "09-compat.txt",
+          "score": 2.2766761905274215
+        }
+      ]
+    },
+    {
+      "id": "Q11",
+      "query": "model OR 報告",
+      "totalHits": 3,
+      "terms": [
+        {
+          "key": "term(model)",
+          "df": 1,
+          "idf": 2.1594842493533726
+        },
+        {
+          "key": "term(報告)",
+          "df": 2,
+          "idf": 1.6486586255873816
+        }
+      ],
+      "hits": [
+        {
+          "file": "02-utf8-bom.txt",
+          "score": 2.8171241611434934
+        },
+        {
+          "file": "03-utf16.txt",
+          "score": 1.6266242810220617
+        },
+        {
+          "file": "06-report.docx",
+          "score": 1.5760702026478512
+        }
+      ]
+    },
+    {
+      "id": "Q12",
+      "query": "資料 -ext:csv",
+      "totalHits": 6,
+      "terms": [
+        {
+          "key": "term(資料)",
+          "df": 7,
+          "idf": 0.550046336919272
+        }
+      ],
+      "hits": [
+        {
+          "file": "11-notes.md",
+          "score": 0.904133563209214
+        },
+        {
+          "file": "09-compat.txt",
+          "score": 0.5798965189609081
+        },
+        {
+          "file": "03-utf16.txt",
+          "score": 0.5426949602749692
+        },
+        {
+          "file": "05-page.html",
+          "score": 0.5426949602749692
+        },
+        {
+          "file": "04-big5.txt",
+          "score": 0.5258284694232581
+        },
+        {
+          "file": "06-report.docx",
+          "score": 0.5258284694232581
+        }
+      ]
+    },
+    {
+      "id": "Q13",
+      "query": "資料 NOT 分析",
+      "totalHits": 5,
+      "terms": [
+        {
+          "key": "term(資料)",
+          "df": 7,
+          "idf": 0.550046336919272
+        }
+      ],
+      "hits": [
+        {
+          "file": "11-notes.md",
+          "score": 0.904133563209214
+        },
+        {
+          "file": "10-資料.csv",
+          "score": 0.8026593152847887
+        },
+        {
+          "file": "09-compat.txt",
+          "score": 0.5798965189609081
+        },
+        {
+          "file": "05-page.html",
+          "score": 0.5426949602749692
+        },
+        {
+          "file": "04-big5.txt",
+          "score": 0.5258284694232581
+        }
+      ]
+    },
+    {
+      "id": "Q14",
+      "query": "ext:txt",
+      "totalHits": 8,
+      "terms": [],
+      "hits": [
+        {
+          "file": "01-utf8-nobom.txt",
+          "score": 0.0
+        },
+        {
+          "file": "02-utf8-bom.txt",
+          "score": 0.0
+        },
+        {
+          "file": "03-utf16.txt",
+          "score": 0.0
+        },
+        {
+          "file": "04-big5.txt",
+          "score": 0.0
+        },
+        {
+          "file": "07-fullwidth.txt",
+          "score": 0.0
+        },
+        {
+          "file": "08-surrogate.txt",
+          "score": 0.0
+        },
+        {
+          "file": "09-compat.txt",
+          "score": 0.0
+        },
+        {
+          "file": "12-模型手冊.txt",
+          "score": 0.0
+        }
+      ]
+    },
+    {
+      "id": "Q15",
+      "query": "資料分析",
+      "totalHits": 2,
+      "terms": [
+        {
+          "key": "phrase(資料 料分 分析)",
+          "df": 2,
+          "idf": 1.6486586255873816
+        }
+      ],
+      "hits": [
+        {
+          "file": "03-utf16.txt",
+          "score": 1.6266242810220617
+        },
+        {
+          "file": "06-report.docx",
+          "score": 1.5760702026478512
+        }
+      ]
+    },
+    {
+      "id": "Q16",
+      "query": "科學 學習",
+      "totalHits": 1,
+      "terms": [
+        {
+          "key": "term(科學)",
+          "df": 1,
+          "idf": 2.1594842493533726
+        },
+        {
+          "key": "term(學習)",
+          "df": 1,
+          "idf": 2.1594842493533726
+        }
+      ],
+      "hits": [
+        {
+          "file": "05-page.html",
+          "score": 4.261245426998458
+        }
+      ]
+    }
+  ]
+}

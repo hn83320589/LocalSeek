@@ -1,0 +1,2 @@
+# Sample corpus files are test fixtures with exact encodings (Big5, UTF-16, BOMs, docx); never convert them.
+samples/corpus/** -text
