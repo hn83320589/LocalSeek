@@ -8,6 +8,7 @@
 
 - C# / .NET 9、Uno Platform（Uno.Sdk 單一專案，WinAppSDK，unpackaged）
 - 索引與設定位置：`%LocalAppData%\LocalSeek\`（可用環境變數 `LOCALSEEK_DATA_DIR` 改到別處，供展示或量測）
+- 教學文件：[docs/tutorial](docs/tutorial/README.md)，以本專案為案例，從需求分析、系統分析、架構設計一路講到核心演算法、測試與效能調校
 
 ![搜尋與預覽](docs/screenshots/search.png)
 
