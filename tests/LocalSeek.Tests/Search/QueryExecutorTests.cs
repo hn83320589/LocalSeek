@@ -1,3 +1,4 @@
+using System.Globalization;
 using LocalSeek.Core.Index;
 using LocalSeek.Core.Query;
 using LocalSeek.Core.Search;
@@ -32,6 +33,30 @@ public class QueryExecutorTests
         Assert.Equal(Expected(6), result.Hits[1].Score, 12);
         Assert.Equal(16, index.TotalLength);
         Assert.Equal(new TermStatistics("term(apple)", 2, idf), result.Terms.Single());
+    }
+
+    [Theory]
+    [InlineData("w1 w2 w1")]
+    [InlineData("w1 w1")]
+    public void Phrase_counts_are_exact_across_many_documents(string phrase)
+    {
+        // Enough documents that phrase matching is split into several document ranges.
+        var random = new Random(31);
+        var bodies = Enumerable.Range(0, 20_003)
+            .Select(_ => Enumerable.Range(0, 30).Select(_ => $"w{random.Next(6)}").ToArray())
+            .ToArray();
+        var index = MemoryIndex.Build(bodies.Select((words, i) => new DocumentInput($@"C:\p\{i}.txt", 100, Jan1, string.Join(' ', words))));
+        var pattern = phrase.Split(' ');
+
+        var tf = QueryExecutor.TermFrequencies(index, QueryBinder.Bind(QueryParser.Parse($"\"{phrase}\"")));
+
+        for (var doc = 0; doc < index.DocCount; doc++)
+        {
+            var words = bodies[int.Parse(Path.GetFileNameWithoutExtension(index.GetMetadata(doc).Path), CultureInfo.InvariantCulture)];
+            var expected = Enumerable.Range(0, words.Length - pattern.Length + 1)
+                .Count(start => pattern.Select((w, k) => words[start + k] == w).All(match => match));
+            Assert.True(expected == tf[doc], $"Document {index.GetMetadata(doc).Path}: expected {expected}, got {tf[doc]}.");
+        }
     }
 
     [Fact]

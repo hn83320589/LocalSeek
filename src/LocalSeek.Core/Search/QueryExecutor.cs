@@ -13,6 +13,9 @@ public sealed class QueryExecutor
 {
     private const int CancellationCheckInterval = 4096;
 
+    /// <summary>Bitset words per parallel phrase-matching range (64 × 64 = 4,096 documents).</summary>
+    private const int PhraseRangeWords = 64;
+
     private readonly IIndexReader _index;
     private readonly TimeZoneInfo _timeZone;
     private readonly CancellationToken _cancellation;
@@ -272,7 +275,9 @@ public sealed class QueryExecutor
 
     /// <summary>
     /// Counts start positions s where Terms[i] occurs at s + i for every i. Documents containing every
-    /// term are found from postings alone; positions are then decoded only for those documents.
+    /// term are found from postings alone; positions are then decoded only for those documents. Terms are
+    /// decoded and document ranges matched in parallel, since a phrase of terms present in every document
+    /// is the slowest query there is.
     /// </summary>
     private void AccumulatePhrase(int[] tf, TermSpace space, IReadOnlyList<string> terms, int weight)
     {
@@ -311,32 +316,57 @@ public sealed class QueryExecutor
             }
         }
 
-        var lists = new Dictionary<string, PositionLists>(StringComparer.Ordinal);
-        foreach (var term in distinct)
+        // A term's positions are one sequential stream, but different terms decode independently.
+        var decoded = new PositionLists[distinct.Count];
+        RunInParallel(distinct.Count, i =>
         {
             _cancellation.ThrowIfCancellationRequested();
             var list = new PositionLists(_index.DocCount);
-            _index.ForEachPositions(space, term, list.Add, doc => (candidates![doc >> 6] & (1UL << doc)) != 0);
-            lists[term] = list;
-        }
+            _index.ForEachPositions(space, distinct[i], list.Add, doc => (candidates![doc >> 6] & (1UL << doc)) != 0);
+            decoded[i] = list;
+        });
 
-        var perTerm = terms.Select(t => lists[t]).ToArray();
-        var cursors = new int[perTerm.Length];
-        var checkedDocs = 0;
-        for (var w = 0; w < candidates!.Length; w++)
+        // Documents are independent: each range writes only its own tf entries.
+        var perTerm = terms.Select(t => decoded[distinct.IndexOf(t)]).ToArray();
+        var ranges = (candidates!.Length + PhraseRangeWords - 1) / PhraseRangeWords;
+        RunInParallel(ranges, range =>
         {
-            var bits = candidates[w];
-            while (bits != 0)
+            var cursors = new int[perTerm.Length];
+            var checkedDocs = 0;
+            var end = Math.Min(candidates.Length, (range + 1) * PhraseRangeWords);
+            for (var w = range * PhraseRangeWords; w < end; w++)
             {
-                var doc = (w * 64) + BitOperations.TrailingZeroCount(bits);
-                bits &= bits - 1;
-                if ((++checkedDocs % 1024) == 0)
+                var bits = candidates[w];
+                while (bits != 0)
                 {
-                    _cancellation.ThrowIfCancellationRequested();
-                }
+                    var doc = (w * 64) + BitOperations.TrailingZeroCount(bits);
+                    bits &= bits - 1;
+                    if ((++checkedDocs % 1024) == 0)
+                    {
+                        _cancellation.ThrowIfCancellationRequested();
+                    }
 
-                tf[doc] += weight * CountPhraseStarts(perTerm, doc, cursors);
+                    tf[doc] += weight * CountPhraseStarts(perTerm, doc, cursors);
+                }
             }
+        });
+    }
+
+    /// <summary>
+    /// Runs the body for 0..count-1 on the thread pool and rethrows the original exception rather than
+    /// an AggregateException, so callers still see OperationCanceledException or IndexCorruptException.
+    /// </summary>
+    private void RunInParallel(int count, Action<int> body)
+    {
+        try
+        {
+            Parallel.For(0, count, new ParallelOptions { CancellationToken = _cancellation }, body);
+        }
+        catch (AggregateException ex)
+        {
+            var inner = ex.Flatten().InnerExceptions;
+            _cancellation.ThrowIfCancellationRequested();
+            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(inner[0]).Throw();
         }
     }
 
