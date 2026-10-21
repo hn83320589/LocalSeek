@@ -137,6 +137,46 @@ Line("");
 Line($"範例：`{andQueries[0]}`、`{phraseQueries[0]}`");
 Line("");
 
+// ------------------------------------------------------------------ 3b. worst case: most frequent terms
+const int HotTermCount = 25;
+int docCount;
+using (var counting = reopened.AcquireSnapshot())
+{
+    docCount = counting.DocCount;
+}
+
+var hot = MostFrequentTerms(reopened, extractor, HotTermCount);
+var hotPairs = hot.SelectMany((a, i) => hot.Skip(i + 1).Select(b => (a.Term, b.Term))).ToList();
+var hotAndLatencies = Measure(reopened, hotPairs.Select(p => $"{p.Item1} {p.Item2}").ToList());
+var hotPhraseLatencies = Measure(reopened, hotPairs.Select(p => $"\"{p.Item1} {p.Item2}\"").ToList());
+var sampledDf = andQueries.Take(100)
+    .SelectMany(q => q.Split(' '))
+    .Select(term => DocumentFrequency(reopened, term))
+    .Order()
+    .ToList();
+Line($"### 最壞情境：文件頻率最高的 {HotTermCount} 個詞兩兩配對");
+Line("");
+Line($"| 查詢類型 | 筆數 | P50 | P95 | 最大 | 限制 |");
+Line($"|---|---|---|---|---|---|");
+Line(Row("最高頻兩詞 AND", hotAndLatencies));
+Line(Row("最高頻兩詞片語", hotPhraseLatencies));
+Line("");
+Line($"範例：`{hotPairs[0].Item1} {hotPairs[0].Item2}`、`\"{hotPairs[0].Item1} {hotPairs[0].Item2}\"`");
+Line("");
+Line($"詞頻分佈（df = 含該詞的文件數，N = {docCount:N0}）：");
+Line("");
+Line("| | 詞 | df | df / N |");
+Line("|---|---|---|---|");
+foreach (var rank in new[] { 1, 5, 10, HotTermCount })
+{
+    var (term, df) = hot[rank - 1];
+    Line($"| 第 {rank} 高 | `{term}` | {df:N0} | {(double)df / docCount:P1} |");
+}
+
+Line($"| 隨機查詢用詞（前 100 條 AND 的 200 個詞）| 中位數 | {sampledDf[sampledDf.Count / 2]:N0} | {(double)sampledDf[sampledDf.Count / 2] / docCount:P1} |");
+Line($"| 隨機查詢用詞 | 第 95 百分位 | {sampledDf[(int)(sampledDf.Count * 0.95)]:N0} | {(double)sampledDf[(int)(sampledDf.Count * 0.95)] / docCount:P1} |");
+Line("");
+
 // ------------------------------------------------------------------ 4. save → searchable
 var visibility = await MeasureVisibilityAsync(reopened, fileSystem, extractor, options.Corpus.TrimEnd('\\'));
 Line("## 4. 存檔後可被搜尋到的時間（含 500 ms 防抖）");
@@ -187,7 +227,7 @@ static (List<string> And, List<string> Phrase) SampleQueries(IndexWriter writer,
     while (andQueries.Count < count || phraseQueries.Count < count)
     {
         var path = snapshot.GetMetadata(random.Next(snapshot.DocCount)).Path;
-        if (extractor.Extract(path, File.ReadAllBytes(path)) is not ExtractionResult.Success text)
+        if (!File.Exists(path) || extractor.Extract(path, File.ReadAllBytes(path)) is not ExtractionResult.Success text)
         {
             continue;
         }
@@ -216,6 +256,45 @@ static (List<string> And, List<string> Phrase) SampleQueries(IndexWriter writer,
     }
 
     return (andQueries, phraseQueries);
+}
+
+/// <summary>
+/// The terms with the highest document frequency: candidates come from document frequencies in a
+/// sample of 3,000 documents, then each candidate's exact df is read from the index.
+/// </summary>
+static List<(string Term, int Df)> MostFrequentTerms(IndexWriter writer, ContentExtractor extractor, int count)
+{
+    var random = new Random(78);
+    var sampleDf = new Dictionary<string, int>(StringComparer.Ordinal);
+    using (var snapshot = writer.AcquireSnapshot())
+    {
+        for (var sampled = 0; sampled < 3000;)
+        {
+            var path = snapshot.GetMetadata(random.Next(snapshot.DocCount)).Path;
+            if (!File.Exists(path) || extractor.Extract(path, File.ReadAllBytes(path)) is not ExtractionResult.Success text)
+            {
+                continue;
+            }
+
+            sampled++;
+            foreach (var term in Tokenizer.TokenizeToList(text.Text).Tokens.Where(t => t.Kind != TokenKind.CjkSingle).Select(t => t.Text).Distinct())
+            {
+                sampleDf[term] = sampleDf.GetValueOrDefault(term) + 1;
+            }
+        }
+    }
+
+    return sampleDf.OrderByDescending(p => p.Value).Take(200)
+        .Select(p => (p.Key, DocumentFrequency(writer, p.Key)))
+        .OrderByDescending(p => p.Item2)
+        .Take(count)
+        .ToList();
+}
+
+static int DocumentFrequency(IndexWriter writer, string term)
+{
+    using var snapshot = writer.AcquireSnapshot();
+    return QueryExecutor.Execute(snapshot, QueryBinder.Bind(QueryParser.Parse(term)), SearchOptions.Default).TotalHits;
 }
 
 /// <summary>Runs the real indexing service with FileSystemWatcher and times new/modified files until they are found.</summary>
