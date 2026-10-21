@@ -237,7 +237,7 @@ Footer      5 × (offset, length, CRC32) | headerCrc | footerCrc | "LSEKEND\0"
 
 ## 6. 測試
 
-`dotnet test tests/LocalSeek.Tests`：**472 個測試案例**，在開發機上約 9 秒跑完。
+`dotnet test tests/LocalSeek.Tests`：**475 個測試案例**，在開發機上約 9 秒跑完。
 
 **參考解與假檔案系統的獨立性**
 - `tests/LocalSeek.Tests/Reference/` 是不建索引、直接掃描記憶體中所有文件的引擎。它有自己的 tokenizer（整串先 NFKC 再逐 code point 掃描，不追蹤座標）、自己的 binder、布林求值、片語計數、篩選與 BM25 計算。
@@ -275,18 +275,22 @@ Footer      5 × (offset, length, CRC32) | headerCrc | footerCrc | "LSEKEND\0"
 **測量環境**
 - CPU：Intel Core i7-13700。量測程式把行程限制在 16 個邏輯處理器，也就是 8 個 P-core 含超執行緒，以對應題目的 8 核開發機；索引平行度為 8。
 - 記憶體 32 GB、NVMe SSD、Windows 11 Pro 10.0.26200、.NET 9.0.17（Release）。
-- 語料：`CorpusGen --mixed` 產生的 50,000 個檔案，共 944 MB，平均 19.3 KB。
+- 語料：`CorpusGen --mixed` 產生的 50,000 個檔案，共 946 MB，平均 19.4 KB。
 
 | 項目 | 結果 | 限制 |
 |---|---|---|
-| 完整建立索引（含合併完成） | 109 s（抽取、分詞、寫入、提交 87 s） | ≤ 240 s |
-| 記憶體峰值（Working Set） | 398 MB | ≤ 600 MB |
-| 開啟既有索引 | 142 ms | ≤ 2 s |
-| 兩詞 AND，P95（300 條） | 1.4 ms | ≤ 100 ms |
-| 片語，P95（300 條） | 43 ms | ≤ 100 ms |
-| 存檔到可被搜尋（含 500 ms 防抖，10 次） | 平均 545 ms，最大 566 ms | ≤ 3 s |
+| 完整建立索引（含合併完成） | 135 s（抽取、分詞、寫入、提交 105 s） | ≤ 240 s |
+| 記憶體峰值（Working Set） | 402 MB | ≤ 600 MB |
+| 開啟既有索引 | 192 ms（新行程 154 ms） | ≤ 2 s |
+| 兩詞 AND，P95（300 條，隨機抽詞） | 1.6 ms | ≤ 100 ms |
+| 片語，P95（300 條，隨機抽詞） | 48.8 ms | ≤ 100 ms |
+| 最壞情境：最高頻 25 詞兩兩組成的 AND，P95 | 1.9 ms | ≤ 100 ms |
+| 最壞情境：最高頻 25 詞兩兩組成的片語，P95 | **81.2 ms（第二次 98.0 ms）** | ≤ 100 ms |
+| 存檔到可被搜尋（含 500 ms 防抖，10 次） | 平均 551 ms，最大 566 ms | ≤ 3 s |
 
-查詢從實際文件的文字中隨機抽詞組成，所以每條查詢都有命中。片語調校前的 P95 是 118 ms；改成「先以 postings 求候選，再只解碼候選文件的位置」之後降到 43 ms。
+- 隨機查詢從實際文件的文字中抽詞組成，所以每條查詢都有命中。
+- 最壞情境取文件頻率最高的 25 個詞；在這份語料中，它們出現在全部 50,000 份文件裡。這樣的片語必須解碼兩個詞在每一份文件中的位置，P95 雖然符合限制，但**餘裕很小**，詳見 [docs/perf-results.md](docs/perf-results.md)。
+- 片語調校前的 P95 是 118 ms；改成「先以 postings 求候選，再只解碼候選文件的位置」之後降到目前的水準。
 
 ---
 
@@ -299,7 +303,7 @@ Footer      5 × (offset, length, CRC32) | headerCrc | footerCrc | "LSEKEND\0"
 | 索引只存位置，摘要時重新抽取 | 索引小約一半 | 預覽需要再讀一次檔案；檔案已變時以當下內容為準 |
 | term-at-a-time 加稠密陣列 | 簡單、易驗證，10 萬份文件內足夠快 | 文件數到百萬級時需要改用 doc-at-a-time 或 skip list |
 | 保留最近兩個提交 | 最新 manifest 損毀時可以退回前一版 | 被取代的片段晚一個提交才刪除 |
-| 開啟時只驗證小區段的 CRC | 開啟時間 142 ms | 大區段損毀要等到 `VerifySegments()` 才會發現 |
+| 開啟時只驗證小區段的 CRC | 開啟時間約 150 至 200 ms | 大區段損毀要等到 `VerifySegments()` 才會發現 |
 | 預設跳過隱藏與系統檔（決策 D） | 避開 Office 暫存檔 `~$*.docx` 等雜訊 | 可在設定中關閉 |
 | 跟隨連結但以 canonical 路徑去重；目標在根內的連結略過（決策 C） | 迴圈必定終止，也不會重複索引 | 只能經由連結到達的根內路徑，會以實際路徑顯示 |
 | glob 比對完整相對路徑（決策 E） | 與規格一致 | `*.tmp` 只排除根目錄下的檔案，要排除全部須寫 `**/*.tmp` |
@@ -315,6 +319,7 @@ Footer      5 × (offset, length, CRC32) | headerCrc | footerCrc | "LSEKEND\0"
 - **watcher 延遲期間的統計值**：從檔案刪除到提交（約 0.5 至 1.5 秒）之間，統計值仍包含該檔案。
 - **長路徑與檔案總管**：超過 260 字元的路徑可以索引與搜尋，但 `explorer /select` 可能無法定位。
 - **只支援單一執行個體**：題目不要求處理多開。
+- **只支援 Windows**：引擎與爬檔的路徑判斷直接使用 `\` 分隔符（例如判斷檔案是否位於某資料夾之下），因此 Core 與 Indexing 雖然是純 `net9.0`，在 Linux 或 macOS 上無法正確運作；測試也只在 Windows 上執行。
 - **量測時的作業系統快取**：開啟時間是在同一行程建索引後量測的，屬於暖快取；冷啟動時磁碟讀取會稍慢。
 
 ---
@@ -342,6 +347,6 @@ Footer      5 × (offset, length, CRC32) | headerCrc | footerCrc | "LSEKEND\0"
 | 21 | `Settings/GlobTests`、`Settings/SettingsStoreTests` |
 | 22 | `tests/LocalSeek.Perf`、[docs/perf-results.md](docs/perf-results.md) |
 | 23 | `ViewModels/OtherViewModelTests`（計數一致）、上方診斷頁截圖（實測） |
-| 24 | 472 個測試案例，含 12 組性質測試 |
+| 24 | 475 個測試案例，含 12 組性質測試 |
 | 25 | 本文件、[samples/expected/README.md](samples/expected/README.md)、[docs/architecture.md](docs/architecture.md) |
 | 26 | `.github/workflows/ci.yml` |

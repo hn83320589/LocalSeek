@@ -185,3 +185,53 @@ dotnet test tests/LocalSeek.Tests -c Release --no-build
 dotnet run -c Release --project tools/LocalSeek.CorpusGen -- --out D:\perf\corpus --count 50000 --mixed
 dotnet run -c Release --project tests/LocalSeek.Perf -- --corpus D:\perf\corpus --work D:\perf\work --threads 8 --queries 300 --cores 16
 ```
+
+---
+
+## 9. 第二輪：依審查意見的修正（2026-10-21）
+
+| 審查意見 | 處理 | 證據 |
+|---|---|---|
+| 簡體 GBK 檔案被誤判為 Big5，索引成亂碼 | **已修正**：通過 Big5 結構檢查後，漢字達 10 個以上時，常用字（Big5 第一級，0xA440–0xC67E）須占 85% 以上，否則以「無法判定編碼」跳過，並在診斷頁顯示「疑似簡體 GBK」 | `ExtractionTests`：`Simplified_chinese_gbk_is_not_mistaken_for_big5`（先確認這段 GBK 位元組確實是合法的 Big5，修正前此測試失敗）、`Big5_with_a_few_rare_ideographs_is_still_accepted`、`Too_few_ideographs_to_judge_fall_back_to_big5` |
+| 缺少測試報告與 CI 證據 | 本文件；CI 連結見第 2 節 T8，最新 commit 的 CI 結果見下方 | 本機 trx：475/475 通過 |
+| 效能查詢集沒有涵蓋最高頻詞 | **已補上**：最高頻 25 詞兩兩配對的 AND 與片語各 300 條，並寫出詞頻分佈 | `docs/perf-results.md` 第 3 節與第 5 節 |
+| 路徑寫死 Windows 的 `\` | README 已知限制註明「只支援 Windows」，程式不修改（題目只針對 Windows） | README 第 9 節 |
+| 保留兩個提交，大合併後暫時多留舊片段 | 刻意的取捨，維持不變 | README 第 8 節 |
+| 沒有測試證明片段數以對數成長 | **與事實不符**：`IndexProperties.Merging_preserves_results_and_keeps_segment_count_logarithmic` 在加入 500 份文件的過程中，每 10 份提交一次，並斷言片段數不超過 `(MergeFactor − 1) × (層數 + 1)`，也就是 O(log N) 的上限 | `tests/LocalSeek.Tests/Properties/IndexProperties.cs` |
+
+### 門檻值的依據
+
+- **做法**：把 repo 內的繁體中文文件切成每段 10、20、30、40 個漢字的樣本。
+  - 繁體樣本直接編成 Big5。
+  - 簡體樣本先用 Windows 內建的繁轉簡功能轉換，再編成 GBK，然後當成 Big5 解讀。
+- **結果**：
+
+| 每段漢字數 | 繁體被誤擋（門檻 85%） | GBK 被誤收（門檻 85%） | 繁體最低比例 | GBK 最高比例 |
+|---|---|---|---|---|
+| 10 | 0 / 1462 | 16 / 1462（1.1%） | 90.0% | 100% |
+| 20 | 0 / 730 | 2 / 730（0.3%） | 95.0% | 90.0% |
+| 30 | 0 / 486 | 0 / 486 | 96.7% | 80.0% |
+| 40 | 0 / 363 | 0 / 363 | 97.5% | 72.5% |
+
+- **限制**：
+  - 漢字少於 10 個的檔案無法可靠判斷，仍依位元組結構當成 Big5。
+  - 大量使用罕用字的繁體檔案（例如古籍、罕見人名）可能被擋。被擋的檔案會出現在診斷頁，不會無聲遺失。
+
+### 效能重測（新語料）
+
+`CorpusGen` 改為只用 Big5 常用字，否則它產生的 Big5 檔案會被新規則擋下。因此重新產生了 50,000 份語料並重新量測：
+
+| 項目 | 結果 | 限制 | 結果 |
+|---|---|---|---|
+| 完整建立索引 | 135.2 s | ≤ 240 s | ✅ |
+| 記憶體峰值 | 402 MB | ≤ 600 MB | ✅ |
+| 開啟既有索引 | 192 ms（新行程 154 ms） | ≤ 2 s | ✅ |
+| 兩詞 AND P95（隨機 / 最高頻） | 1.6 ms / 1.9 ms | ≤ 100 ms | ✅ |
+| 片語 P95（隨機） | 48.8 ms（第二次 54.0 ms） | ≤ 100 ms | ✅ |
+| 片語 P95（最高頻 25 詞兩兩配對） | 81.2 ms（第二次 **98.0 ms**） | ≤ 100 ms | ✅，但餘裕很小 |
+| 存檔到可被搜尋 | 最大 566 ms | ≤ 3 s | ✅ |
+
+**新發現 F4**：
+- **現象**：最壞情境的片語查詢只是勉強符合限制。最高頻的詞出現在全部 50,000 份文件中，由它們組成的片語必須解碼兩個詞在每份文件中的位置，第二次量測的 P95 是 98.0 ms，單一查詢最慢 162 ms。
+- **影響**：在較慢的 8 核心機器上可能超過 100 ms。
+- **可能的改善方向**：把片語比對依文件範圍分段平行處理，或為高頻雙字詞的組合另建索引。這屬於架構層面的變更，尚未進行。
