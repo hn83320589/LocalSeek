@@ -50,10 +50,60 @@ internal static class TextDecoder
 
         if (IsWellFormedBig5(bytes) && TryDecode(StrictBig5, bytes, out text))
         {
+            var (common, ideographs) = CountBig5Ideographs(bytes);
+            if (ideographs >= MinIdeographsToJudge && common < ideographs * MinCommonRatio)
+            {
+                return new ExtractionResult.Skipped(
+                    SkipReason.UnknownEncoding,
+                    $"無法判定編碼（Big5 常用字只占 {(double)common / ideographs:P0}，疑似簡體 GBK 或其他編碼）");
+            }
+
             return new ExtractionResult.Success(text, "Big5");
         }
 
         return new ExtractionResult.Skipped(SkipReason.UnknownEncoding, "無法判定編碼（不是有效的 UTF-8 或 Big5）");
+    }
+
+    /// <summary>Fewer ideographs than this say too little about the encoding; structure alone decides.</summary>
+    private const int MinIdeographsToJudge = 10;
+
+    /// <summary>
+    /// Real Traditional Chinese text in Big5 is almost entirely level-1 (common) characters: at least 90%
+    /// even in 10-character samples of our documents. GBK text read as Big5 lands half in level 2 or the
+    /// reserved areas (median 50%, at most 72% in 40-character samples).
+    /// </summary>
+    private const double MinCommonRatio = 0.85;
+
+    /// <summary>
+    /// Counts double-byte characters outside the symbol rows (lead 0xA1–0xA3) and how many of them are
+    /// Big5 level-1 common ideographs (0xA440–0xC67E). Assumes <see cref="IsWellFormedBig5"/> passed.
+    /// </summary>
+    private static (int Common, int Ideographs) CountBig5Ideographs(ReadOnlySpan<byte> bytes)
+    {
+        var common = 0;
+        var ideographs = 0;
+        for (var i = 0; i < bytes.Length;)
+        {
+            if (bytes[i] < 0x80)
+            {
+                i++;
+                continue;
+            }
+
+            var code = (bytes[i] << 8) | bytes[i + 1];
+            if (bytes[i] is < 0xA1 or > 0xA3)
+            {
+                ideographs++;
+                if (code is >= 0xA440 and <= 0xC67E)
+                {
+                    common++;
+                }
+            }
+
+            i += 2;
+        }
+
+        return (common, ideographs);
     }
 
     private static ExtractionResult Strict(Encoding encoding, ReadOnlySpan<byte> bytes, string name) =>

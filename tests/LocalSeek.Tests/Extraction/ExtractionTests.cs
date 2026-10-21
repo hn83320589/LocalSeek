@@ -70,6 +70,52 @@ public class ExtractionTests
         Assert.Equal(text, Text(Extract("客戶.csv", Big5.GetBytes(text))));
     }
 
+    private static Encoding Gbk => Encoding.GetEncoding(936);
+
+    private static bool DecodesAsStrictBig5(byte[] bytes)
+    {
+        try
+        {
+            Encoding.GetEncoding(950, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback).GetString(bytes);
+            return true;
+        }
+        catch (DecoderFallbackException)
+        {
+            return false;
+        }
+    }
+
+    [Fact]
+    public void Simplified_chinese_gbk_is_not_mistaken_for_big5()
+    {
+        var bytes = Gbk.GetBytes("这是一份简体中文的报告，内容包括数据分析与模型研究。");
+        Assert.True(DecodesAsStrictBig5(bytes), "Precondition: the GBK bytes are also valid Big5 (e.g. 涴岆珨爺潠极笢恅腔惆豢).");
+
+        var result = Extract("简体.txt", bytes);
+
+        Assert.Equal(SkipReason.UnknownEncoding, Skipped(result));
+        Assert.Contains("常用字", ((ExtractionResult.Skipped)result).Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Big5_with_a_few_rare_ideographs_is_still_accepted()
+    {
+        // 20 common ideographs and 2 rare ones (Big5 level 2): about 91% common.
+        const string text = "臺灣資料分析報告民國八十年王小明電話地址公司涴岆";
+
+        Assert.Equal(text, Text(Extract("old.txt", Big5.GetBytes(text))));
+    }
+
+    [Fact]
+    public void Too_few_ideographs_to_judge_fall_back_to_big5()
+    {
+        // Below the minimum sample the common-character ratio says nothing, so structure alone decides.
+        var bytes = Gbk.GetBytes("简体报告");
+        Assert.True(DecodesAsStrictBig5(bytes));
+
+        Assert.Equal("Big5", Assert.IsType<ExtractionResult.Success>(Extract("short.txt", bytes)).Encoding);
+    }
+
     [Fact]
     public void Utf8_csv_and_xml_are_plain_text()
     {

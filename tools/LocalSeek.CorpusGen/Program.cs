@@ -73,7 +73,10 @@ internal sealed record Options(string Output, int Count, double AverageKilobytes
     }
 }
 
-/// <summary>Zipf-distributed CJK and Latin words. CJK characters are limited to those Big5 can encode.</summary>
+/// <summary>
+/// Zipf-distributed CJK and Latin words. CJK characters are Big5 level-1 (common) ideographs, like real
+/// Traditional Chinese text; LocalSeek rejects Big5 files dominated by rare characters as likely GBK.
+/// </summary>
 internal sealed class Vocabulary
 {
     private const string Punctuation = "，。、；：！？";
@@ -92,8 +95,11 @@ internal sealed class Vocabulary
         {
             try
             {
-                big5.GetBytes(c.ToString());
-                pool.Add(c);
+                var bytes = big5.GetBytes(c.ToString());
+                if (((bytes[0] << 8) | bytes[1]) is >= 0xA440 and <= 0xC67E)
+                {
+                    pool.Add(c);
+                }
             }
             catch (EncoderFallbackException)
             {
