@@ -2,7 +2,7 @@
 
 - 日期：2026-10-21
 - 受測版本：`main` @ `cf5f47d`（與 GitHub `origin/main` 相同）
-- 結論：**26 項驗收標準全部符合。** 另有 3 項不影響驗收的發現，見第 7 節。
+- 結論：**26 項驗收標準全部符合。** 另有 3 項不影響驗收的發現，見第 7 節；其中 F1 已修正。
 
 ---
 
@@ -24,7 +24,7 @@
 |---|---|---|---|
 | T1 | 乾淨建置整個 Solution | `dotnet build LocalSeek.sln -c Release --no-incremental`（`TreatWarningsAsErrors`） | ✅ 0 個警告、0 個錯誤 |
 | T2 | 完整單元測試，連跑 3 次 | `dotnet test tests/LocalSeek.Tests -c Release` | ✅ 3 次都是 464/464 通過，各約 7 至 9 秒 |
-| T3 | 性質測試另外試 20 個種子 | `LOCALSEEK_SEED=1001…1020`，篩選 `Properties` | ✅ 所有與參考解的比對都通過；有 3 個「涵蓋量下限」斷言在單一案例重播模式下失敗，屬於測試工具的問題，見 F1 |
+| T3 | 性質測試另外試 20 個種子 | `LOCALSEEK_SEED=1001…1020`，篩選 `Properties` | ✅ 所有與參考解的比對都通過；有 3 個「涵蓋量下限」斷言在單一案例重播模式下失敗，屬於測試工具的問題，見 F1（已修正，修正後重跑 20 個種子 0 失敗） |
 | T4 | 並行與計時類測試重複 10 次 | 篩選 `ConcurrencyStress`、`SnapshotIsolation`、`CancellationLatency` | ✅ 10/10 通過 |
 | T5 | 50,000 份文件的效能量測（從零重建） | `tests/LocalSeek.Perf --cores 16 --threads 8 --queries 300` | ✅ 全部在限制內，見第 4 節 |
 | T6 | 由新行程開啟既有索引 | 同上，加 `--skip-build` | ✅ 166 ms |
@@ -119,7 +119,7 @@
 | 21 | glob（*、**、?、大小寫、分隔符）；設定檔損毀時用預設值並提示 | 單元測試 | `GlobTests`（35 個）、`SettingsStoreTests`（9 個），含 `Damaged_file_falls_back_to_defaults_with_warning_and_backup` | ✅ |
 | 22 | 效能符合限制，README 載明測量環境 | 效能測試＋實測 | 第 4 節重測全數符合；README 第 7 節與 `docs/perf-results.md` | ✅ |
 | 23 | 診斷頁列出跳過與失敗的檔案與原因，數字一致 | 實測＋測試 | `OtherViewModelTests`（計數一致）；T7 診斷頁實測 | ✅ |
-| 24 | ≥ 250 個案例（含 ≥ 8 組性質測試），全數通過 | 執行測試 | 464 個案例、12 組性質測試，T2 三次全過，CI 也通過 | ✅ |
+| 24 | ≥ 250 個案例（含 ≥ 8 組性質測試），全數通過 | 執行測試 | 464 個案例、12 組性質測試，T2 三次全過，CI 也通過；修正 F1 後為 472 個，全數通過 | ✅ |
 | 25 | README 含建置、截圖、架構、格式、演算法、效能、取捨、限制 | 檢視 README | README 第 1 至 10 節，含 4 張截圖 | ✅ |
 | 26 | CI 在 Windows 建置並測試、綠燈、README 有徽章、上傳 win-x64 artifact | 檢視 Actions | T8：run 39406707082 success；artifact `LocalSeek-win-x64`（86.9 MB）與 `test-results`；README 第 3 行有徽章 | ✅ |
 
@@ -141,14 +141,18 @@
 
 ## 7. 發現事項（不影響驗收）
 
-### F1：性質測試在單一種子重播模式下，會因涵蓋量斷言而失敗（輕微，屬於測試工具）
+### F1：性質測試在單一種子重播模式下，會因涵蓋量斷言而失敗（輕微，屬於測試工具）— 已修正
 
 - **現象**：設定 `LOCALSEEK_SEED` 後只會執行 1 個案例，但以下 3 個性質測試在迴圈結束後還會檢查涵蓋量下限，因此一定失敗：`Boolean_hit_sets_match_reference`（至少 2000 條查詢）、`Phrase_occurrence_counts_match_reference`（至少 300 條片語）、`Snippets_and_highlights_are_bounded_ordered_exact_and_merged`（至少 1000 個命中）。
 - **影響**：
   - 重播一個真正失敗的案例時，比對錯誤會先在迴圈內拋出，所以重現功能仍然有效。
   - 但重播成功時會出現誤導性的失敗訊息。
   - 正常執行（不設定環境變數）不受影響。
-- **建議**：重播模式下略過涵蓋量斷言。本次只記錄，未修改。
+- **修正**：
+  - 新增 `Property.AssertCoverage`：正常執行時照常檢查涵蓋量下限，重播模式下略過。
+  - 上述 5 個涵蓋量斷言改用它；性質本身的比對斷言都在迴圈內，沒有更動。
+  - 新增 `PropertyRunnerTests`（8 個案例），驗證種子解析，以及兩種模式下的行為。
+- **驗證**：修正後全部 472 個測試通過；`LOCALSEEK_SEED=1001…1020` 重播 20 次，0 失敗。
 
 ### F2：單一片語查詢最慢約 109 ms
 

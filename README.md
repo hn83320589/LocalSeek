@@ -237,7 +237,7 @@ Footer      5 × (offset, length, CRC32) | headerCrc | footerCrc | "LSEKEND\0"
 
 ## 6. 測試
 
-`dotnet test tests/LocalSeek.Tests`：**464 個測試案例**，在開發機上約 9 秒跑完。
+`dotnet test tests/LocalSeek.Tests`：**472 個測試案例**，在開發機上約 9 秒跑完。
 
 **參考解與假檔案系統的獨立性**
 - `tests/LocalSeek.Tests/Reference/` 是不建索引、直接掃描記憶體中所有文件的引擎。它有自己的 tokenizer（整串先 NFKC 再逐 code point 掃描，不追蹤座標）、自己的 binder、布林求值、片語計數、篩選與 BM25 計算。
@@ -342,6 +342,6 @@ Footer      5 × (offset, length, CRC32) | headerCrc | footerCrc | "LSEKEND\0"
 | 21 | `Settings/GlobTests`、`Settings/SettingsStoreTests` |
 | 22 | `tests/LocalSeek.Perf`、[docs/perf-results.md](docs/perf-results.md) |
 | 23 | `ViewModels/OtherViewModelTests`（計數一致）、上方診斷頁截圖（實測） |
-| 24 | 464 個測試案例，含 12 組性質測試 |
+| 24 | 472 個測試案例，含 12 組性質測試 |
 | 25 | 本文件、[samples/expected/README.md](samples/expected/README.md)、[docs/architecture.md](docs/architecture.md) |
 | 26 | `.github/workflows/ci.yml` |

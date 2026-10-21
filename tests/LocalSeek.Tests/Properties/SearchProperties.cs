@@ -52,8 +52,8 @@ public class SearchProperties
             nonEmpty += expected.Count > 0 ? 1 : 0;
         });
 
-        Assert.True(checkedQueries >= 2000, $"Only {checkedQueries} valid queries were checked.");
-        Assert.True(nonEmpty >= checkedQueries / 2, $"Only {nonEmpty}/{checkedQueries} queries had hits; generator too sparse.");
+        Property.AssertCoverage(checkedQueries >= 2000, $"Only {checkedQueries} valid queries were checked.");
+        Property.AssertCoverage(nonEmpty >= checkedQueries / 2, $"Only {nonEmpty}/{checkedQueries} queries had hits; generator too sparse.");
         Assert.True(f.Docs.Count >= 300);
     }
 
@@ -115,8 +115,8 @@ public class SearchProperties
             crossScript += terms.Any(t => t[0] < 0x80) && terms.Any(t => t[0] >= 0x80) ? 1 : 0;
         });
 
-        Assert.True(withHits >= 300, $"Only {withHits} phrases had hits.");
-        Assert.True(crossScript >= 100, $"Only {crossScript} cross-script phrases.");
+        Property.AssertCoverage(withHits >= 300, $"Only {withHits} phrases had hits.");
+        Property.AssertCoverage(crossScript >= 100, $"Only {crossScript} cross-script phrases.");
     }
 
     [Fact]

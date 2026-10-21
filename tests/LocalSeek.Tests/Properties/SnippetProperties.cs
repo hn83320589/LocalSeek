@@ -87,7 +87,7 @@ public class SnippetProperties
             Assert.Equal(union, highlighted);
         });
 
-        Assert.True(checkedHits > 1000, $"Only {checkedHits} hits checked.");
+        Property.AssertCoverage(checkedHits > 1000, $"Only {checkedHits} hits checked.");
     }
 
     private static string Blank(string s) => new(s.Select(c => char.IsControl(c) ? ' ' : c).ToArray());
