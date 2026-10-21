@@ -202,7 +202,7 @@ Footer      5 × (offset, length, CRC32) | headerCrc | footerCrc | "LSEKEND\0"
 ### 執行與計分
 
 - **term-at-a-time**：每個詞項先算出 `int[] tf`（內文 + 2 × 檔名），布林結構轉成 bitset，再對命中文件以正向詞項計分。
-- 片語：先只用 postings 求出所有詞都出現的候選文件；接著只解碼候選文件的位置（其他文件的 varint 直接跳過）；最後用單向合併計算連續的起始位置數。
+- 片語：先只用 postings 求出所有詞都出現的候選文件；接著只解碼候選文件的位置（其他文件的 varint 直接跳過），不同的詞平行解碼；最後用單向合併計算連續的起始位置數，文件依 4,096 份一段平行比對。
 - BM25 變形：`idf = ln(1 + (N − df + 0.5) / (df + 0.5))`，`k1 = 1.2`，`b = 0.75`。N、Σlen、df 都是快照當下由現存文件精確計算的整數；相同詞項只計一次，依固定順序加總。同分依完整路徑（OrdinalIgnoreCase）排序。
 - 取消：每 4096 筆 postings、每 1024 個片語候選檢查一次，取消在 50 ms 內生效（有測試）。
 
@@ -237,7 +237,7 @@ Footer      5 × (offset, length, CRC32) | headerCrc | footerCrc | "LSEKEND\0"
 
 ## 6. 測試
 
-`dotnet test tests/LocalSeek.Tests`：**475 個測試案例**，在開發機上約 9 秒跑完。
+`dotnet test tests/LocalSeek.Tests`：**477 個測試案例**，在開發機上約 9 秒跑完。
 
 **參考解與假檔案系統的獨立性**
 - `tests/LocalSeek.Tests/Reference/` 是不建索引、直接掃描記憶體中所有文件的引擎。它有自己的 tokenizer（整串先 NFKC 再逐 code point 掃描，不追蹤座標）、自己的 binder、布林求值、片語計數、篩選與 BM25 計算。
@@ -279,18 +279,18 @@ Footer      5 × (offset, length, CRC32) | headerCrc | footerCrc | "LSEKEND\0"
 
 | 項目 | 結果 | 限制 |
 |---|---|---|
-| 完整建立索引（含合併完成） | 135 s（抽取、分詞、寫入、提交 105 s） | ≤ 240 s |
-| 記憶體峰值（Working Set） | 402 MB | ≤ 600 MB |
-| 開啟既有索引 | 192 ms（新行程 154 ms） | ≤ 2 s |
-| 兩詞 AND，P95（300 條，隨機抽詞） | 1.6 ms | ≤ 100 ms |
-| 片語，P95（300 條，隨機抽詞） | 48.8 ms | ≤ 100 ms |
-| 最壞情境：最高頻 25 詞兩兩組成的 AND，P95 | 1.9 ms | ≤ 100 ms |
-| 最壞情境：最高頻 25 詞兩兩組成的片語，P95 | **81.2 ms（第二次 98.0 ms）** | ≤ 100 ms |
-| 存檔到可被搜尋（含 500 ms 防抖，10 次） | 平均 551 ms，最大 566 ms | ≤ 3 s |
+| 完整建立索引（含合併完成） | 118 s（抽取、分詞、寫入、提交 94 s） | ≤ 240 s |
+| 記憶體峰值（Working Set） | 403 MB | ≤ 600 MB |
+| 開啟既有索引 | 175 ms（新行程 168 ms） | ≤ 2 s |
+| 兩詞 AND，P95（300 條，隨機抽詞） | 1.5 ms | ≤ 100 ms |
+| 片語，P95（300 條，隨機抽詞） | 30.7 ms | ≤ 100 ms |
+| 最壞情境：最高頻 25 詞兩兩組成的 AND，P95 | 1.4 ms | ≤ 100 ms |
+| 最壞情境：最高頻 25 詞兩兩組成的片語，P95 | 49.6 ms（第二次 54.2 ms） | ≤ 100 ms |
+| 存檔到可被搜尋（含 500 ms 防抖，10 次） | 平均 547 ms，最大 559 ms | ≤ 3 s |
 
 - 隨機查詢從實際文件的文字中抽詞組成，所以每條查詢都有命中。
-- 最壞情境取文件頻率最高的 25 個詞；在這份語料中，它們出現在全部 50,000 份文件裡。這樣的片語必須解碼兩個詞在每一份文件中的位置，P95 雖然符合限制，但**餘裕很小**，詳見 [docs/perf-results.md](docs/perf-results.md)。
-- 片語調校前的 P95 是 118 ms；改成「先以 postings 求候選，再只解碼候選文件的位置」之後降到目前的水準。
+- 最壞情境取文件頻率最高的 25 個詞；在這份語料中，它們出現在全部 50,000 份文件裡。這樣的片語必須解碼兩個詞在每一份文件中的位置，是最慢的查詢。單執行緒時 P95 為 81 至 98 ms，餘裕很小；改為平行解碼與平行比對後降到 50 至 54 ms，詳見 [docs/perf-results.md](docs/perf-results.md)。
+- 片語最初的 P95 是 118 ms（舊語料）；改成「先以 postings 求候選，再只解碼候選文件的位置」後降到 43 ms，再加上平行化後降到目前的水準。
 
 ---
 
@@ -347,6 +347,6 @@ Footer      5 × (offset, length, CRC32) | headerCrc | footerCrc | "LSEKEND\0"
 | 21 | `Settings/GlobTests`、`Settings/SettingsStoreTests` |
 | 22 | `tests/LocalSeek.Perf`、[docs/perf-results.md](docs/perf-results.md) |
 | 23 | `ViewModels/OtherViewModelTests`（計數一致）、上方診斷頁截圖（實測） |
-| 24 | 475 個測試案例，含 12 組性質測試 |
+| 24 | 477 個測試案例，含 12 組性質測試 |
 | 25 | 本文件、[samples/expected/README.md](samples/expected/README.md)、[docs/architecture.md](docs/architecture.md) |
 | 26 | `.github/workflows/ci.yml` |
