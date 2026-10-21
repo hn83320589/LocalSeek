@@ -248,3 +248,10 @@ dotnet run -c Release --project tests/LocalSeek.Perf -- --corpus D:\perf\corpus 
 | 片語 P95（隨機） | 30.7 ms（第二次 34.4 ms） | ≤ 100 ms |
 | 片語 P95（最高頻 25 詞兩兩配對） | **49.6 ms（第二次 54.2 ms）**，最慢 71.5 ms | ≤ 100 ms |
 | 存檔到可被搜尋 | 最大 565 ms | ≤ 3 s |
+
+### 最新 CI 結果
+
+- Commit：`a550f59`（包含本輪全部修正）
+- Run：[39534542671](https://github.com/hn83320589/LocalSeek/actions/runs/39534542671)，結論 **success**。Restore、Build、Test、Publish win-x64 與兩個上傳步驟都成功。
+- Artifact：`LocalSeek-win-x64`（86.9 MB）、`test-results`（109 KB）
+- trx 統計（取自 CI 的 `test-results.trx`）：total 477、executed 477、passed 477、failed 0、error 0、timeout 0、aborted 0、notExecuted 0；執行時間約 10.5 秒。
